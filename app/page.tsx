@@ -49,13 +49,22 @@ interface Review {
   created_at: string; 
 }
 
-const categoryMenu = [
-  { title: "খিমার প্লাজু সেট", subs: ["প্রিমিয়াম খিমার", "সুতি খিমার"] },
-  { title: "ফ্লোর টাচ জিলবাব", subs: ["ওয়ান পার্ট জিলবাব", "টু পার্ট জিলবাব"] },
-  { title: "ওয়ান পার্ট জিলবাব", subs: ["সফট লিলেন জিলবাব"] },
-  { title: "সালাত লং খিমার", subs: [] },
-  { title: "লাক্সারি আবায়া", subs: ["দুবাই চেরি আবায়া"] },
-  { title: "নিকাহ নামা ও উপহার", subs: ["নিকাহ নামা", "গিফট বক্স"] }
+const fontOptions = [
+  { name: "Default Font (Sans Serif)", value: "sans-serif" },
+  { name: "Hind Siliguri (Clean Bengali)", value: "'Hind Siliguri', sans-serif" },
+  { name: "Noto Serif Bengali (Royal & Elegant)", value: "'Noto Serif Bengali', serif" },
+  { name: "Baloo Da 2 (Soft & Modern)", value: "'Baloo Da 2', cursive" },
+  { name: "Tiro Bangla (Classic Book Style)", value: "'Tiro Bangla', serif" },
+  { name: "Mina (Contemporary Bangla)", value: "'Mina', sans-serif" },
+  { name: "Anek Bangla (Bold & Wide)", value: "'Anek Bangla', sans-serif" },
+  { name: "Galada (Stylized Bangla)", value: "'Galada', cursive" },
+  { name: "Atma (Playful & Casual)", value: "'Atma', cursive" },
+  { name: "Playfair Display (English Luxury)", value: "'Playfair Display', serif" },
+  { name: "Cinzel (English Royal)", value: "'Cinzel', serif" },
+  { name: "Montserrat (English Minimal)", value: "'Montserrat', sans-serif" },
+  { name: "Poppins (English Modern)", value: "'Poppins', sans-serif" },
+  { name: "Oswald (English Tall)", value: "'Oswald', sans-serif" },
+  { name: "Roboto (English Standard)", value: "'Roboto', sans-serif" }
 ];
 
 export default function Home() {
@@ -139,14 +148,20 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
 
-  const [customSections, setCustomSections] = useState<{id: string, title: string, fontSize: number, imageUrl: string}[]>([]);
+  const [customSections, setCustomSections] = useState<{id: string, title: string, fontSize: number, imageUrl: string, color?: string}[]>([]);
 
   const [storeSettings, setStoreSettings] = useState({
-    shop_name: 'Tawfik Mart', 
+    shop_name: 'ZEENAT', 
     phone: '01632331534',
     logo_url: '',
     flashDealActive: true,
-    contact_info: 'অফিস: ঢাকা\nফোন: 01632331534\nইমেইল: support@tawfikmart.com',
+    bg_enabled: true,
+    bg_opacity: 70,
+    font_family: 'sans-serif',
+    brand_name_color: '#B8860B',
+    heading_color: '#B8860B',
+    page_text_color: '#374151',
+    contact_info: 'অফিস: ঢাকা\nফোন: 01632331534\nইমেইল: support@zeenat.com',
     return_policy: 'পণ্য হাতে পাওয়ার পর যদি কোনো ত্রুটি থাকে, তবে ২৪ ঘণ্টার মধ্যে আমাদের সাথে যোগাযোগ করুন।',
     delivery_policy: 'ঢাকার ভেতরে ডেলিভারি চার্জ ৬০ টাকা (১-২ দিন)।\nঢাকার বাইরে ডেলিভারি চার্জ ১২০ টাকা (২-৪ দিন)।',
     endTime: Date.now() + 12 * 60 * 60 * 1000,
@@ -275,8 +290,8 @@ export default function Home() {
         if (!loadedSections || !Array.isArray(loadedSections)) {
             loadedSections = [];
             Object.keys(safeCatBanners).forEach(key => {
-                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS'].includes(key)) {
-                    loadedSections.push({ id: Date.now().toString() + Math.random(), title: key, fontSize: 36, imageUrl: safeCatBanners[key] });
+                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR'].includes(key)) {
+                    loadedSections.push({ id: Date.now().toString() + Math.random(), title: key, fontSize: 36, imageUrl: safeCatBanners[key], color: '#B8860B' });
                 }
             });
         }
@@ -285,7 +300,7 @@ export default function Home() {
         setStoreSettings(prev => ({ 
           ...prev, 
           ...data, 
-          shop_name: data.shop_name || 'Tawfik Mart', 
+          shop_name: data.shop_name || 'ZEENAT', 
           phone: data.phone || '01632331534', 
           banners: safeBanners, 
           category_banners: safeCatBanners,
@@ -293,6 +308,12 @@ export default function Home() {
           return_policy: safeCatBanners['TXT_RETURN'] || prev.return_policy,
           delivery_policy: safeCatBanners['TXT_DELIVERY'] || prev.delivery_policy,
           flashDealActive: safeCatBanners['FLASH_ACTIVE'] !== undefined ? safeCatBanners['FLASH_ACTIVE'] : true,
+          bg_enabled: safeCatBanners['BG_ENABLED'] !== undefined ? safeCatBanners['BG_ENABLED'] : true,
+          bg_opacity: safeCatBanners['BG_OPACITY'] !== undefined ? Number(safeCatBanners['BG_OPACITY']) : 70,
+          font_family: safeCatBanners['FONT_FAMILY'] || 'sans-serif',
+          brand_name_color: safeCatBanners['BRAND_NAME_COLOR'] || '#B8860B',
+          heading_color: safeCatBanners['HEADING_COLOR'] || '#B8860B',
+          page_text_color: safeCatBanners['PAGE_TEXT_COLOR'] || '#374151',
         }));
       }
     } catch(err) {}
@@ -485,8 +506,34 @@ export default function Home() {
       } 
       else if (type === 'product1') setNewImageUrl(publicUrl); else if (type === 'product2') setNewImageUrl2(publicUrl); else if (type === 'product3') setNewImageUrl3(publicUrl); else if (type === 'product4') setNewImageUrl4(publicUrl);
       
-      fetchSettings(); alert("সফলভাবে আপলোড হয়েছে!");
+      fetchSettings(); 
     } catch (error: any) { alert("আপলোড ব্যর্থ হয়েছে! কারণ:\n" + error.message); } finally { setUploadingType(null); }
+  };
+
+  const handleRemoveImage = async (type: string, index?: number) => {
+    if (!window.confirm("সত্যিই কি ছবিটি মুছে ফেলতে চান?")) return;
+    try {
+      if (type === 'logo') {
+        const { error } = await supabase.from('store_settings').update({ logo_url: '' }).eq('id', 1);
+        if(error) throw error;
+      } 
+      else if (type === 'website_bg') {
+        const newCatBanners = { ...storeSettings.category_banners };
+        delete newCatBanners['WEBSITE_BG'];
+        const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+        if(error) throw error;
+      } 
+      else if (type === 'banner' && index !== undefined) {
+        let newBanners = [...storeSettings.banners];
+        newBanners[index].imageUrl = '';
+        const { error } = await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+        if(error) throw error;
+      }
+      alert("ছবিটি সফলভাবে মুছে ফেলা হয়েছে!");
+      fetchSettings(); 
+    } catch (error: any) {
+      alert("রিমুভ করতে সমস্যা হয়েছে: " + error.message);
+    }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -498,7 +545,13 @@ export default function Home() {
          'TXT_RETURN': storeSettings.return_policy,
          'TXT_DELIVERY': storeSettings.delivery_policy,
          'FLASH_ACTIVE': storeSettings.flashDealActive,
-         'CUSTOM_SECTIONS': customSections 
+         'CUSTOM_SECTIONS': customSections,
+         'BG_ENABLED': storeSettings.bg_enabled,
+         'BG_OPACITY': storeSettings.bg_opacity,
+         'FONT_FAMILY': storeSettings.font_family,
+         'BRAND_NAME_COLOR': storeSettings.brand_name_color,
+         'HEADING_COLOR': storeSettings.heading_color,
+         'PAGE_TEXT_COLOR': storeSettings.page_text_color
       };
       const { error } = await supabase.from('store_settings').update({ shop_name: storeSettings.shop_name, phone: storeSettings.phone, category_banners: newCatBanners }).eq('id', 1);
       if(error) throw error; 
@@ -514,12 +567,13 @@ export default function Home() {
   const openEditModal = (product: Product, e: React.MouseEvent) => { 
     e.stopPropagation(); setEditingProductId(product.id); setNewName(product.name); setNewPrice(product.price); setNewOriginalPrice(product.original_price || ''); 
     setNewImageUrl(product.image_url || ''); setNewImageUrl2(product.image_url_2 || ''); setNewImageUrl3(product.image_url_3 || ''); setNewImageUrl4(product.image_url_4 || '');
-    setNewDescription(product.description || ''); setNewCategory(product.category); setNewBrand(product.brand || ''); setNewColor(product.color || ''); setNewTag(product.tag || ''); setNewInStock(product.in_stock !== false); setShowProductModal(true); 
+    setNewDescription(product.description || ''); setNewCategory(product.category); setNewBrand(product.brand || ''); setNewColor(product.color || ''); setNewTag(product.tag || ''); setNewInStock(product.in_stock !== false); setShowProductModal(true); setShowAdminDashboard(false);
   };
   
-  const handleDeleteProduct = async (id: string, e: React.MouseEvent) => { 
-    e.stopPropagation(); if (!window.confirm("সত্যিই কি প্রোডাক্টটি ডিলিট করতে চান?")) return; 
-    try { await supabase.from('products').delete().eq('id', id); fetchProducts(); } catch (error) { alert("ডিলিট ব্যর্থ।"); } 
+  const handleDeleteProduct = async (id: string, e?: React.MouseEvent) => { 
+    if(e) e.stopPropagation(); 
+    if (!window.confirm("সত্যিই কি প্রোডাক্টটি ডিলিট করতে চান?")) return; 
+    try { await supabase.from('products').delete().eq('id', id); fetchProducts(); alert("প্রোডাক্টটি সফলভাবে ডিলিট হয়েছে!"); } catch (error) { alert("ডিলিট ব্যর্থ।"); } 
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -528,16 +582,22 @@ export default function Home() {
       const productData = { 
         name: newName, price: newPrice, original_price: newOriginalPrice || null, 
         image_url: newImageUrl || null, image_url_2: newImageUrl2 || null, image_url_3: newImageUrl3 || null, image_url_4: newImageUrl4 || null, 
-        description: newDescription || null, category: newCategory || "খিমার প্লাজু সেট", in_stock: newInStock, tag: newTag, brand: newBrand || null, color: newColor || null
+        description: newDescription || null, category: newCategory || "New Category", in_stock: newInStock, tag: newTag, brand: newBrand || null, color: newColor || null
       };
       if (editingProductId) await supabase.from('products').update(productData).eq('id', editingProductId); else await supabase.from('products').insert([productData]);
-      setShowProductModal(false); fetchProducts(); 
+      setShowProductModal(false); fetchProducts(); alert("সফলভাবে সেভ হয়েছে!");
     } catch (error: any) { alert("Error saving product: " + error.message); } finally { setIsSaving(false); }
   };
 
-  const dynamicSidebarCategories = Array.from(new Set([...categoryMenu.map(c=>c.title), ...products.map(p=>p.category)]));
+  // সম্পূর্ণ ডাইনামিক ক্যাটাগরি তৈরি 
+  const dynamicSidebarCategories = Array.from(new Set([
+    ...customSections.map(c => c.title), 
+    ...products.map(p => p.category).filter(Boolean)
+  ]));
+
   const filteredProducts = products.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const bgImage = storeSettings.category_banners?.['WEBSITE_BG'];
+  const isBgVisible = storeSettings.bg_enabled && bgImage;
   const renderedCategories = new Set<string>();
 
   const renderProductCard = (item: Product, isAdminView: boolean = false) => {
@@ -545,45 +605,47 @@ export default function Home() {
     const inWishlist = wishlist.some(w => w.id === item.id);
 
     return (
-      <div key={item.id} className="bg-[#E6DBDB] border border-gray-400 flex flex-col relative w-full overflow-hidden hover:shadow-lg transition-all duration-300 group cursor-pointer rounded-sm" onClick={() => { setViewingProduct(item); setActiveImage(item.image_url || ''); setSelectedQuantity(1); }}>
+      <div key={item.id} className="bg-white border border-[#EADFC8] flex flex-col relative w-full overflow-hidden hover:shadow-[0_8px_30px_rgb(212,175,55,0.15)] hover:border-[#D4AF37] transition-all duration-500 group cursor-pointer rounded-md" onClick={() => { setViewingProduct(item); setActiveImage(item.image_url || ''); setSelectedQuantity(1); }}>
         
         {discount > 0 && (
-          <div className="absolute top-2 right-2 bg-[#222] text-white text-[10px] font-bold rounded-full w-9 h-9 flex flex-col items-center justify-center z-10 leading-tight shadow-md">
+          <div className="absolute top-2 right-2 bg-[#D4AF37] text-white text-[10px] font-bold rounded-full w-9 h-9 flex flex-col items-center justify-center z-10 leading-tight shadow-md">
             {discount}%<span className="text-[8px] font-normal">ছাড়</span>
           </div>
         )}
 
-        <button onClick={(e) => toggleWishlist(item, e)} className="absolute top-2 left-2 z-10 bg-white/70 backdrop-blur-sm p-1.5 rounded-full hover:bg-white border border-gray-300 shadow-sm transition">
-          {inWishlist ? <span className="text-red-500 text-sm">❤️</span> : <span className="text-gray-500 text-sm hover:text-black">🤍</span>}
+        <button onClick={(e) => toggleWishlist(item, e)} className="absolute top-2 left-2 z-10 bg-white/80 backdrop-blur-md p-1.5 rounded-full hover:bg-white border border-[#EADFC8] shadow-sm transition">
+          {inWishlist ? <span className="text-red-500 text-sm">❤️</span> : <span className="text-gray-400 text-sm hover:text-[#D4AF37]">🤍</span>}
         </button>
         
         {isAdminView && (
           <div className="absolute top-12 left-2 z-10 flex flex-col gap-1">
-             <button onClick={(e) => openEditModal(item, e)} className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded shadow">Edit</button>
-             <button onClick={(e) => handleDeleteProduct(item.id, e)} className="bg-red-600 text-white text-[10px] px-2 py-1 rounded shadow">Delete</button>
+             <button onClick={(e) => openEditModal(item, e)} className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded shadow hover:bg-blue-700 transition">Edit</button>
+             <button onClick={(e) => handleDeleteProduct(item.id, e)} className="bg-red-600 text-white text-[10px] px-2 py-1 rounded shadow hover:bg-red-700 transition">Delete</button>
           </div>
         )}
 
-        <div className="w-full bg-white relative overflow-hidden flex items-center justify-center border-b border-gray-300" style={{ height: '230px' }}>
+        <div className="w-full bg-[#FAF5EB] relative overflow-hidden flex items-center justify-center border-b border-[#EADFC8]" style={{ height: '240px' }}>
              {item.image_url ? (
-               <img src={item.image_url} className="w-full h-full object-cover absolute inset-0 group-hover:scale-105 transition-transform duration-500 ease-in-out" />
+               <img src={item.image_url} className="w-full h-full object-cover absolute inset-0 group-hover:scale-105 transition-transform duration-700 ease-in-out" />
              ) : (
                <span className="text-gray-400 text-xs font-medium">No Image</span>
              )}
         </div>
         
-        <div className="p-3 flex flex-col items-center text-center flex-grow bg-[#E6DBDB]">
-          <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">{item.category}</p>
-          <h4 className="text-[12px] text-gray-800 font-bold mb-1.5 line-clamp-1">{item.name}</h4>
+        <div className="p-4 flex flex-col items-center text-center flex-grow bg-white">
+          <p className="text-[9px] text-[#D4AF37] font-bold uppercase tracking-[0.2em] mb-1.5">{item.category}</p>
+          <h4 className="text-[13px] text-[#111412] font-bold mb-2 line-clamp-1">{item.name}</h4>
           
-          {item.original_price && <span className="text-[11px] text-gray-500 line-through">৳ {formatPrice(item.original_price)}</span>}
-          <span className="text-black font-black text-lg mb-3">{formatPrice(item.price)} ৳</span>
+          <div className="flex flex-col items-center justify-center mb-4 mt-auto w-full leading-tight">
+            {item.original_price && <span className="text-[12px] text-gray-400 line-through mb-0.5">৳ {formatPrice(item.original_price)}</span>}
+            <span className="text-[#B8860B] font-black text-xl">{formatPrice(item.price)} ৳</span>
+          </div>
           
-          <div className="w-full flex flex-col gap-2 mt-auto">
-            <button onClick={(e) => handleDirectOrder(item, 1, e)} disabled={!item.in_stock} className="w-full bg-[#222] text-white text-[12px] font-bold py-2 rounded-sm flex items-center justify-center gap-1.5 hover:bg-black transition-colors">
+          <div className="w-full flex flex-col gap-2">
+            <button onClick={(e) => handleDirectOrder(item, 1, e)} disabled={!item.in_stock} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[12px] font-bold py-2.5 rounded-sm flex items-center justify-center gap-1.5 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300">
               ⚡ অর্ডার করুন
             </button>
-            <button onClick={(e) => { e.stopPropagation(); addToCart(item, 1); setIsCartOpen(true); }} disabled={!item.in_stock} className="w-full bg-white text-black border border-gray-400 text-[12px] font-bold py-2 rounded-sm flex items-center justify-center gap-1.5 hover:bg-gray-100 transition-colors">
+            <button onClick={(e) => { e.stopPropagation(); addToCart(item, 1); setIsCartOpen(true); }} disabled={!item.in_stock} className="w-full bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[12px] font-bold py-2.5 rounded-sm flex items-center justify-center gap-1.5 hover:bg-[#EADFC8] transition-colors duration-300">
               🛒 ব্যাগে যোগ
             </button>
           </div>
@@ -593,76 +655,87 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen text-gray-800 font-sans relative overflow-x-hidden scroll-smooth" 
+    <main className="min-h-screen text-[#111412] relative overflow-x-hidden scroll-smooth" 
           style={{ 
-            backgroundColor: bgImage ? "transparent" : "#D4C5C5",
-            backgroundImage: bgImage ? `url('${bgImage}')` : "none",
+            fontFamily: storeSettings.font_family,
+            backgroundColor: "#FAF5EB",
+            backgroundImage: isBgVisible ? `url('${bgImage}')` : "none",
             backgroundSize: 'cover',
             backgroundAttachment: 'fixed',
             backgroundPosition: 'center'
           }}>
       
-      <div className={`relative z-10 min-h-screen pb-16 ${bgImage ? 'bg-[#D4C5C5]/90 backdrop-blur-[2px]' : ''}`}>
+      <style dangerouslySetInnerHTML={{__html: `
+        @import url('https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@400;700&family=Atma:wght@400;700&family=Baloo+Da+2:wght@400;700&family=Cinzel:wght@400;700&family=Galada&family=Hind+Siliguri:wght@400;700&family=Mina:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Serif+Bengali:wght@400;700&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;700&family=Roboto:wght@400;700&family=Tiro+Bangla&display=swap');
+      `}} />
+
+      <div className="relative z-10 min-h-screen pb-16 transition-colors duration-300"
+           style={{
+             backgroundColor: isBgVisible ? `rgba(250, 245, 235, ${storeSettings.bg_opacity / 100})` : 'transparent',
+             backdropFilter: isBgVisible ? 'blur(4px)' : 'none'
+           }}>
         
-        <div className="bg-[#F8F9FA] text-[#333333] text-[11px] py-2 px-4 md:px-12 flex justify-center md:justify-between items-center border-b border-gray-200">
-          <div className="flex gap-4 items-center font-semibold">
+        <div className="bg-[#111412] text-[#D4AF37] text-[11px] py-2.5 px-4 md:px-12 flex justify-center md:justify-between items-center border-b border-[#D4AF37]/30">
+          <div className="flex gap-4 items-center font-bold tracking-widest uppercase">
             <span>☎ হেল্পলাইন: {storeSettings.phone}</span>
-            <span className="hidden md:inline px-4 border-l border-gray-300">◀ অফার</span>
+            <span className="hidden md:inline px-4 border-l border-[#D4AF37]/30 text-[#EADFC8]">◀ এক্সক্লুসিভ অফার</span>
           </div>
-          <div className="hidden md:flex gap-4 font-semibold">
-             <button onClick={() => { setShowTrackingModal(true); setTrackedOrders(null); setTrackingPhone(''); }} className="hover:text-black transition-colors">ট্র্যাক অর্ডার</button>
+          <div className="hidden md:flex gap-4 font-bold tracking-widest uppercase">
+             <button onClick={() => { setShowTrackingModal(true); setTrackedOrders(null); setTrackingPhone(''); }} className="hover:text-white transition-colors">ট্র্যাক অর্ডার</button>
           </div>
         </div>
 
-        <header className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 md:px-12 py-4 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center w-full md:w-auto justify-between md:justify-start gap-4">
-            <button onClick={() => setIsSidebarOpen(true)} className="text-2xl text-gray-800 hover:text-black">☰</button>
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}}>
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-white flex items-center justify-center font-bold text-2xl border border-gray-300 rounded shadow-sm overflow-hidden">
-                {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : <span className="text-gray-800">{storeSettings.shop_name.charAt(0)}</span>}
+        <header className="sticky top-0 z-40 bg-white border-b border-[#EADFC8] px-4 md:px-12 py-4 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center w-full md:w-auto justify-between md:justify-start gap-4 md:gap-6">
+            <button onClick={() => setIsSidebarOpen(true)} className="text-2xl text-[#111412] hover:text-[#D4AF37] transition-colors">☰</button>
+            <div className="flex items-center gap-4 cursor-pointer" onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}}>
+              <div className="relative flex items-center justify-center p-1.5">
+                <div className="absolute inset-0 rounded-full border-l-[3px] border-b-[3px] border-[#D4AF37] shadow-[-3px_3px_8px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
+                <div className="w-12 h-12 md:w-14 md:h-14 bg-[#111412] flex items-center justify-center font-bold text-2xl rounded-full overflow-hidden z-10 relative">
+                  {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : <span className="text-[#D4AF37] font-serif italic text-3xl">🌙</span>}
+                </div>
               </div>
-              <div className="flex flex-col">
-                 <h1 className="text-lg md:text-xl font-serif font-bold text-black uppercase leading-none tracking-wide">{storeSettings.shop_name}</h1>
-                 <span className="text-[8px] md:text-[9px] text-gray-500 uppercase tracking-widest mt-1">Loyalty is the capital of business</span>
+              <div className="flex flex-col justify-center">
+                 <h1 className="text-2xl md:text-3xl font-serif italic font-black leading-none tracking-[0.1em] drop-shadow-[0_2px_4px_rgba(212,175,55,0.3)]" style={{ color: storeSettings.brand_name_color, textShadow: "2px 2px 4px rgba(0,0,0,0.5), 0 0 10px rgba(212,175,55,0.4)" }}>{storeSettings.shop_name}</h1>
+                 <span className="text-[9px] md:text-[10px] text-[#111412] uppercase tracking-[0.4em] mt-1.5 font-bold">Premium Edition</span>
               </div>
             </div>
           </div>
 
-          <div className="w-full md:w-1/2 flex border border-gray-300 rounded-sm overflow-hidden bg-white shadow-inner">
-            <input type="text" placeholder="পণ্য খুঁজুন এখানে..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full py-2.5 pl-4 pr-10 text-sm text-black outline-none bg-transparent" />
-            <button className="bg-[#222] text-white px-6 hover:bg-black transition-colors">🔍</button>
+          <div className="w-full md:w-1/2 flex border border-[#EADFC8] rounded-md overflow-hidden bg-[#FAF5EB] shadow-inner focus-within:border-[#D4AF37] transition-colors">
+            <input type="text" placeholder="পণ্য খুঁজুন এখানে..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full py-3 pl-5 pr-10 text-sm text-[#111412] outline-none bg-transparent font-medium" />
+            <button className="bg-[#111412] text-[#D4AF37] px-8 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold tracking-widest">খুঁজুন</button>
           </div>
 
-          <div className="hidden md:flex items-center gap-6">
-            <button onClick={() => { if(user) setShowProfileModal(true); else setShowAuthModal(true); }} className="text-xl text-gray-700 hover:text-black transition-colors">👤</button>
-            <button onClick={() => setIsWishlistOpen(true)} className="relative text-xl text-gray-700 hover:text-black transition-colors">
-              ❤️{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
+          <div className="hidden md:flex items-center gap-7">
+            <button onClick={() => { if(user) setShowProfileModal(true); else setShowAuthModal(true); }} className="text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">👤</button>
+            <button onClick={() => setIsWishlistOpen(true)} className="relative text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">
+              ❤️{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
             </button>
-            <button onClick={() => setIsCartOpen(true)} className="relative text-2xl text-gray-700 hover:text-black transition-colors">
-              🛒{cart.length > 0 && <span className="absolute -top-1 -right-3 bg-black text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{totalItemsCount}</span>}
+            <button onClick={() => setIsCartOpen(true)} className="relative text-2xl text-[#111412] hover:text-[#D4AF37] transition-colors">
+              🛒{cart.length > 0 && <span className="absolute -top-1 -right-3 bg-[#111412] text-[#D4AF37] text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-[#D4AF37]">{totalItemsCount}</span>}
             </button>
           </div>
         </header>
 
-        <div className="hidden md:flex justify-center items-center gap-6 py-3 bg-white border-b border-gray-300 text-xs font-semibold text-gray-700 uppercase tracking-wider">
-           <span className="cursor-pointer hover:text-black" onClick={() => setActiveCategory('All')}>সকল ক্যাটাগরি</span>
-           <span className="cursor-pointer hover:text-black text-gray-400">⚡ ফ্লাশ সেল</span>
-           <span className="cursor-pointer hover:text-black text-gray-400">নতুন পণ্য</span>
-           <span className="cursor-pointer hover:text-black text-gray-400">অফার</span>
-           <span className="cursor-pointer hover:text-black text-gray-400">সকল ব্র্যান্ড</span>
-           <span className="cursor-pointer hover:text-black text-gray-400">অন্যান্য ▾</span>
+        <div className="hidden md:flex justify-center items-center gap-8 py-3.5 bg-white border-b border-[#EADFC8] text-[11px] font-bold text-[#111412] uppercase tracking-[0.15em]">
+           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors" onClick={() => setActiveCategory('All')}>সকল ক্যাটাগরি</span>
+           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors text-gray-500">⚡ ফ্লাশ সেল</span>
+           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors text-gray-500">নতুন কালেকশন</span>
+           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors text-gray-500">এক্সক্লুসিভ</span>
+           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors text-gray-500">সকল ব্র্যান্ড</span>
         </div>
 
-        <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-6 flex flex-col gap-10">
+        <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-12">
           {storeSettings.flashDealActive && activeCategory === 'All' && !searchQuery && activeBanners.length > 0 && (
-            <div className="w-full shadow-sm rounded-sm relative overflow-hidden bg-white border border-gray-300" style={{ height: 'clamp(200px, 35vw, 400px)' }}>
+            <div className="w-full shadow-lg rounded-md relative overflow-hidden bg-white border border-[#EADFC8]" style={{ height: 'clamp(200px, 35vw, 450px)' }}>
               {activeBanners.map((banner, idx) => (
                 <div key={idx} className={`absolute inset-0 transition-opacity duration-1000 ease-in-out bg-cover bg-center ${idx === currentBannerIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} style={{ backgroundImage: `url('${banner.imageUrl}')` }}></div>
               ))}
               {activeBanners.length > 1 && (
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
+                <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 flex gap-2.5 z-20 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
                   {activeBanners.map((_, idx) => (
-                    <div key={idx} onClick={() => setCurrentBannerIndex(idx)} className={`w-2 h-2 rounded-full cursor-pointer transition-all duration-300 shadow-sm ${idx === currentBannerIndex ? 'bg-black w-4' : 'bg-white/70 hover:bg-white'}`}></div>
+                    <div key={idx} onClick={() => setCurrentBannerIndex(idx)} className={`w-2 h-2 rounded-full cursor-pointer transition-all duration-300 shadow-sm ${idx === currentBannerIndex ? 'bg-[#D4AF37] w-5' : 'bg-white hover:bg-[#EADFC8]'}`}></div>
                   ))}
                 </div>
               )}
@@ -671,38 +744,38 @@ export default function Home() {
 
           {activeCategory !== 'All' && (
             <div className="w-full flex justify-start mb-2 mt-4">
-                <button onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}} className="flex items-center gap-2 bg-white text-black px-6 py-2.5 rounded-sm shadow-sm hover:bg-gray-100 transition-colors font-bold uppercase tracking-widest text-xs border border-gray-300">
+                <button onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}} className="flex items-center gap-2 bg-[#111412] text-[#D4AF37] px-6 py-2.5 rounded-sm shadow-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold uppercase tracking-[0.2em] text-xs border border-[#D4AF37]">
                     <span className="text-lg leading-none -mt-0.5">←</span> Back to Home
                 </button>
             </div>
           )}
 
-          <div id="products-section" className="w-full mt-2 flex flex-col gap-16">
+          <div id="products-section" className="w-full mt-2 flex flex-col gap-20">
              {loading ? (
-               <div className="text-center py-20 text-gray-700 text-lg font-bold tracking-widest uppercase animate-pulse">Loading Collection...</div>
+               <div className="text-center py-20 text-[#D4AF37] text-lg font-bold tracking-[0.2em] uppercase animate-pulse">Loading Premium Collection...</div>
              ) : (
                <>
                  {customSections.map(section => {
                     renderedCategories.add(section.title);
                     if (activeCategory !== 'All' && activeCategory !== section.title) return null;
-                    const catProducts = filteredProducts.filter(item => item.category === section.title || categoryMenu.find(c=>c.title===section.title)?.subs.includes(item.category));
+                    const catProducts = filteredProducts.filter(item => item.category === section.title);
                     if (catProducts.length === 0 && !section.imageUrl) return null;
 
                     return (
                       <div key={section.id} className="w-full">
-                        <div className="flex flex-col md:flex-row justify-between items-end border-b border-gray-400 pb-3 mb-6">
-                           <h2 className="font-serif font-bold text-black" style={{ fontSize: `${section.fontSize || 32}px` }}>{section.title}</h2>
-                           <button onClick={() => {setActiveCategory(section.title); window.scrollTo(0,0);}} className="bg-[#222] text-white text-[10px] px-5 py-2 font-bold rounded-sm shadow-sm hover:bg-black transition-colors duration-300 tracking-wider">সবগুলো দেখুন →</button>
+                        <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
+                           <h2 className="font-bold tracking-wide" style={{ fontSize: `${section.fontSize || 32}px`, color: section.color || storeSettings.heading_color || '#B8860B' }}>{section.title}</h2>
+                           <button onClick={() => {setActiveCategory(section.title); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md">সবগুলো দেখুন →</button>
                         </div>
                         
                         {section.imageUrl && activeCategory === 'All' && (
-                          <div className="w-full mb-8 shadow-sm rounded-sm overflow-hidden border border-gray-300 relative" style={{ height: 'clamp(150px, 25vw, 300px)' }}>
+                          <div className="w-full mb-10 shadow-md rounded-sm overflow-hidden border border-[#EADFC8] relative" style={{ height: 'clamp(150px, 25vw, 300px)' }}>
                             <img src={section.imageUrl} alt={section.title} className="w-full h-full object-cover absolute inset-0" />
                           </div>
                         )}
 
                         {catProducts.length > 0 && (
-                           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-5">
+                           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
                              {catProducts.map(item => renderProductCard(item))}
                            </div>
                         )}
@@ -713,17 +786,17 @@ export default function Home() {
                  {dynamicSidebarCategories.map(catTitle => {
                     if (renderedCategories.has(catTitle)) return null;
                     if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
-                    const catProducts = filteredProducts.filter(item => item.category === catTitle || categoryMenu.find(c=>c.title===catTitle)?.subs.includes(item.category));
+                    const catProducts = filteredProducts.filter(item => item.category === catTitle);
                     if (catProducts.length === 0) return null;
 
                     return (
                       <div key={catTitle} className="w-full">
-                        <div className="flex flex-col md:flex-row justify-between items-end border-b border-gray-400 pb-3 mb-6">
-                           <h2 className="text-2xl md:text-3xl font-serif font-bold text-black">{catTitle}</h2>
-                           <button onClick={() => {setActiveCategory(catTitle); window.scrollTo(0,0);}} className="bg-[#222] text-white text-[10px] px-5 py-2 font-bold rounded-sm shadow-sm hover:bg-black transition-colors duration-300 tracking-wider">সবগুলো দেখুন →</button>
+                        <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
+                           <h2 className="text-2xl md:text-3xl font-bold tracking-wide" style={{ color: storeSettings.heading_color || '#B8860B' }}>{catTitle}</h2>
+                           <button onClick={() => {setActiveCategory(catTitle); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md">সবগুলো দেখুন →</button>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-5">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
                           {catProducts.map(item => renderProductCard(item))}
                         </div>
                       </div>
@@ -734,21 +807,21 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="border-t border-gray-400/50 bg-[#DED2D2] mt-24 pb-10 pt-16 shadow-inner relative z-10">
-          <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-3 gap-10 text-sm text-gray-700">
+        <footer className="border-t-4 border-[#D4AF37] bg-[#111412] mt-24 pb-12 pt-20 shadow-inner relative z-10">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-3 gap-12 text-sm text-[#EADFC8]">
             <div>
-              <h4 className="font-serif font-bold text-black text-2xl mb-5 uppercase">{storeSettings.shop_name}</h4>
-              <p className="leading-relaxed mb-4 font-medium max-w-sm text-gray-600">বাংলাদেশের অন্যতম সেরা লাইফস্টাইল এবং ফ্যাশন অনলাইন শপ। আমরা বিশ্বাস করি মডেস্টি এবং আভিজাত্য একে অপরের পরিপূরক।</p>
+              <h4 className="font-serif italic font-bold text-3xl mb-6 uppercase tracking-[0.15em] drop-shadow-[0_2px_4px_rgba(212,175,55,0.3)]" style={{ color: storeSettings.brand_name_color || '#D4AF37' }}>{storeSettings.shop_name}</h4>
+              <p className="leading-relaxed mb-4 font-medium max-w-sm">বাংলাদেশের অন্যতম সেরা প্রিমিয়াম ইসলামিক লাইফস্টাইল এবং ফ্যাশন অনলাইন শপ। আমরা বিশ্বাস করি মডেস্টি এবং আভিজাত্য একে অপরের পরিপূরক।</p>
             </div>
             <div>
-              <h4 className="font-bold text-black mb-5 uppercase text-xs tracking-widest border-b border-gray-400 pb-2 inline-block">Contact Us</h4>
-              <p className="mb-3 hover:text-black transition cursor-pointer font-medium" onClick={() => setInfoModal({title: 'যোগাযোগ', content: storeSettings.contact_info})}>📍 যোগাযোগ তথ্য</p>
-              <p className="mb-3 text-gray-600">📞 ফোন: {storeSettings.phone}</p>
+              <h4 className="font-bold text-[#D4AF37] mb-6 uppercase text-xs tracking-[0.2em] border-b border-[#D4AF37]/30 pb-3 inline-block">Contact Us</h4>
+              <p className="mb-4 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({title: 'যোগাযোগ', content: storeSettings.contact_info})}>📍 যোগাযোগ তথ্য</p>
+              <p className="mb-4 text-[#EADFC8]">📞 ফোন: <span className="text-[#D4AF37] font-bold">{storeSettings.phone}</span></p>
             </div>
             <div>
-              <h4 className="font-bold text-black mb-5 uppercase text-xs tracking-widest border-b border-gray-400 pb-2 inline-block">Policies</h4>
-              <p className="mb-3 hover:text-black transition cursor-pointer font-medium" onClick={() => setInfoModal({title: 'রিটার্ন পলিসি', content: storeSettings.return_policy})}>রিটার্ন পলিসি</p>
-              <p className="mb-3 hover:text-black transition cursor-pointer font-medium" onClick={() => setInfoModal({title: 'ডেলিভারি পলিসি', content: storeSettings.delivery_policy})}>ডেলিভারি পলিসি</p>
+              <h4 className="font-bold text-[#D4AF37] mb-6 uppercase text-xs tracking-[0.2em] border-b border-[#D4AF37]/30 pb-3 inline-block">Policies</h4>
+              <p className="mb-4 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({title: 'রিটার্ন পলিসি', content: storeSettings.return_policy})}>🛡 রিটার্ন পলিসি</p>
+              <p className="mb-4 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({title: 'ডেলিভারি পলিসি', content: storeSettings.delivery_policy})}>🚚 ডেলিভারি পলিসি</p>
             </div>
           </div>
         </footer>
@@ -757,22 +830,22 @@ export default function Home() {
 
       <WhatsAppButton />
 
-      <div className="fixed bottom-0 left-0 w-full bg-[#111] text-white border-t border-gray-800 z-[250] flex justify-between items-center px-6 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-        <div className="text-xs font-mono font-bold tracking-widest uppercase flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]"></span> Admin Mode
+      <div className="fixed bottom-0 left-0 w-full bg-[#111412] text-[#D4AF37] border-t border-[#D4AF37]/30 z-[250] flex justify-between items-center px-6 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        <div className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span> Premium Admin
         </div>
         <div className="flex gap-3">
-           <button onClick={() => { setEditingProductId(null); setShowProductModal(true); setShowAdminDashboard(false); }} className="bg-white text-black px-4 py-1.5 rounded-sm text-xs font-bold hover:bg-gray-200 transition-colors shadow-sm tracking-wider uppercase">+ Add</button>
-           <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-white text-white px-4 py-1.5 rounded-sm text-xs font-bold hover:bg-white hover:text-black transition-colors shadow-sm tracking-wider uppercase">⚙️ Settings</button>
+           <button onClick={() => { setEditingProductId(null); setNewName(''); setNewPrice(''); setNewOriginalPrice(''); setNewImageUrl(''); setNewImageUrl2(''); setNewImageUrl3(''); setNewImageUrl4(''); setNewDescription(''); setNewCategory(''); setNewBrand(''); setNewColor(''); setNewTag(''); setNewInStock(true); setShowProductModal(true); setShowAdminDashboard(false); }} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">+ Add</button>
+           <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.2em] uppercase">⚙️ Settings</button>
         </div>
       </div>
 
       {infoModal && (
-        <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-           <div className="bg-white border border-gray-300 max-w-2xl w-full p-8 md:p-10 relative rounded-sm shadow-2xl">
-              <button onClick={() => setInfoModal(null)} className="absolute top-5 right-6 text-3xl hover:text-red-500 text-gray-400 transition-colors">✕</button>
-              <h3 className="text-2xl font-serif font-bold mb-6 border-b border-gray-200 pb-3 text-black uppercase tracking-widest">{infoModal.title}</h3>
-              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-medium">
+        <div className="fixed inset-0 z-[300] bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4">
+           <div className="bg-white border-2 border-[#D4AF37] max-w-2xl w-full p-8 md:p-12 relative rounded-sm shadow-2xl">
+              <button onClick={() => setInfoModal(null)} className="absolute top-6 right-8 text-3xl hover:text-red-500 text-gray-400 transition-colors">✕</button>
+              <h3 className="text-2xl font-bold mb-6 border-b border-[#EADFC8] pb-4 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>{infoModal.title}</h3>
+              <div className="text-sm whitespace-pre-wrap leading-relaxed font-medium" style={{ color: storeSettings.page_text_color || '#374151' }}>
                  {infoModal.content}
               </div>
            </div>
@@ -781,42 +854,43 @@ export default function Home() {
 
       {isSidebarOpen && (
         <>
-          <div className="fixed inset-0 z-[290] bg-black/50 backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)}></div>
-          <div className="fixed top-0 left-0 w-[280px] md:w-[320px] h-full bg-[#FDFDFD] z-[300] shadow-[5px_0_20px_rgba(0,0,0,0.2)] flex flex-col transform transition-transform duration-300 border-r border-gray-200">
-            <div className="p-4 flex justify-between items-center bg-[#F4F4F4] text-black shadow-sm border-b border-gray-300">
+          <div className="fixed inset-0 z-[290] bg-[#111412]/60 backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)}></div>
+          <div className="fixed top-0 left-0 w-[280px] md:w-[320px] h-full bg-[#FAF5EB] z-[300] shadow-[5px_0_30px_rgba(0,0,0,0.5)] flex flex-col transform transition-transform duration-300 border-r border-[#D4AF37]/50">
+            <div className="p-5 flex justify-between items-center bg-[#111412] text-[#D4AF37] shadow-sm border-b border-[#D4AF37]/30">
               <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 bg-white flex items-center justify-center font-bold text-lg rounded-sm border border-gray-300 overflow-hidden">
-                   {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : storeSettings.shop_name.charAt(0)}
+                 <div className="relative flex items-center justify-center p-1">
+                   <div className="absolute inset-0 rounded-full border-l-[2px] border-b-[2px] border-[#D4AF37] shadow-[-2px_2px_5px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
+                   <div className="w-8 h-8 bg-[#111412] flex items-center justify-center font-bold text-lg rounded-full overflow-hidden z-10 relative">
+                     {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : <span className="text-[#D4AF37]">🌙</span>}
+                   </div>
                  </div>
-                 <span className="font-bold text-sm uppercase tracking-wide">{storeSettings.shop_name}</span>
+                 <span className="font-bold text-xs uppercase tracking-[0.2em] italic" style={{ color: storeSettings.brand_name_color || '#D4AF37' }}>{storeSettings.shop_name}</span>
               </div>
-              <button onClick={() => setIsSidebarOpen(false)} className="text-gray-500 hover:text-black text-2xl font-bold bg-white w-8 h-8 flex items-center justify-center rounded border border-gray-300 transition-colors shadow-sm">✕</button>
+              <button onClick={() => setIsSidebarOpen(false)} className="text-[#D4AF37] hover:text-white text-2xl font-bold bg-transparent w-8 h-8 flex items-center justify-center rounded transition-colors">✕</button>
             </div>
             
-            <div className="flex-1 overflow-y-auto custom-scrollbar py-4 text-[13px] font-bold text-gray-800">
-               <div className="px-6 py-3 hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-3" onClick={() => {setActiveCategory('All'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>🏠</span> হোম</div>
-               <div className="px-6 py-3 hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-3" onClick={() => setIsSidebarOpen(false)}><span>⚡</span> ফ্লাশ সেল</div>
-               <div className="px-6 py-3 hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-3" onClick={() => setIsSidebarOpen(false)}><span>✨</span> নতুন পণ্য</div>
-               <div className="px-6 py-3 hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-3" onClick={() => setIsSidebarOpen(false)}><span>🔥</span> অফার</div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar py-6 text-[12px] font-bold text-[#111412] uppercase tracking-widest">
+               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('All'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> হোম</div>
+               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => setIsSidebarOpen(false)}><span>✦</span> ফ্লাশ সেল</div>
                
-               <div className="my-3 border-t border-gray-200"></div>
-               <div className="px-6 py-2 text-[10px] text-gray-500 uppercase tracking-widest font-black flex items-center gap-2"><span>📂</span> সকল ক্যাটাগরি</div>
+               <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
+               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black flex items-center gap-2 mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>ক্যাটাগরি সমূহ</div>
                {dynamicSidebarCategories.map((cat, i) => (
-                 <div key={i} className="px-6 py-2.5 hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-3 text-gray-700" onClick={() => {setActiveCategory(cat); setIsSidebarOpen(false); window.scrollTo(0,0);}}>
-                   <span className="text-[10px] text-gray-400">▶</span> {cat}
+                 <div key={i} className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#111412]" onClick={() => {setActiveCategory(cat); setIsSidebarOpen(false); window.scrollTo(0,0);}}>
+                   <span className="text-[10px] text-[#D4AF37]">▶</span> {cat}
                  </div>
                ))}
                
-               <div className="my-3 border-t border-gray-200"></div>
-               <div className="px-6 py-2 text-[10px] text-gray-500 uppercase tracking-widest font-black">Links</div>
-               <div className="px-6 py-3 hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-3" onClick={() => { setInfoModal({title: 'যোগাযোগ', content: storeSettings.contact_info}); setIsSidebarOpen(false); }}>
+               <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
+               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>প্রয়োজনীয় লিংক</div>
+               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({title: 'যোগাযোগ', content: storeSettings.contact_info}); setIsSidebarOpen(false); }}>
                   <span>✉</span> যোগাযোগ
                </div>
-               <div className="px-6 py-3 hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-3" onClick={() => { setInfoModal({title: 'রিটার্ন পলিসি', content: storeSettings.return_policy}); setIsSidebarOpen(false); }}>
+               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({title: 'রিটার্ন পলিসি', content: storeSettings.return_policy}); setIsSidebarOpen(false); }}>
                   <span>🛡</span> রিটার্ন পলিসি
                </div>
                
-               <div className="mt-8 mx-5 px-4 py-3 bg-[#222] text-white text-center rounded-sm shadow-md font-bold tracking-widest cursor-pointer hover:bg-black transition-colors duration-300">
+               <div className="mt-10 mx-5 px-4 py-4 bg-[#111412] text-[#D4AF37] text-center rounded-sm shadow-md font-bold tracking-[0.2em] cursor-pointer border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300">
                   📞 {storeSettings.phone}
                </div>
             </div>
@@ -825,28 +899,28 @@ export default function Home() {
       )}
 
       {viewingProduct && (
-        <div className="fixed inset-0 z-[280] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-gray-300 max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden">
-            <div className="flex justify-between items-center bg-[#F9F9F9] border-b border-gray-200 p-4 md:px-8 md:py-4 shadow-sm sticky top-0 z-20">
-               <button onClick={() => setViewingProduct(null)} className="flex items-center gap-2 text-black font-bold uppercase tracking-widest text-sm transition-colors bg-white border border-gray-300 hover:bg-gray-100 px-4 py-2 md:px-5 md:py-2 rounded-sm shadow-sm">
+        <div className="fixed inset-0 z-[280] bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden">
+            <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-4 md:px-8 md:py-5 shadow-sm sticky top-0 z-20">
+               <button onClick={() => setViewingProduct(null)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white px-5 py-2.5 rounded-sm shadow-sm">
                   <span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান
                </button>
-               <button onClick={() => setViewingProduct(null)} className="text-gray-400 hover:text-red-500 text-3xl font-light transition-colors">✕</button>
+               <button onClick={() => setViewingProduct(null)} className="text-[#111412] hover:text-red-600 text-3xl font-light transition-colors">✕</button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-              <div className="flex flex-col md:flex-row gap-10">
-                <div className="w-full md:w-1/2 flex flex-col gap-4">
-                  <div className="w-full bg-white rounded-sm border border-gray-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative" style={{ height: 'clamp(300px, 40vh, 500px)' }}>
+            <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-white">
+              <div className="flex flex-col md:flex-row gap-12">
+                <div className="w-full md:w-1/2 flex flex-col gap-5">
+                  <div className="w-full bg-[#FAF5EB] rounded-sm border border-[#EADFC8] flex items-center justify-center p-2 overflow-hidden shadow-sm relative" style={{ height: 'clamp(300px, 40vh, 500px)' }}>
                      {activeImage ? <img src={activeImage} className="w-full h-full object-contain md:object-cover absolute inset-0 p-2" /> : <span className="text-gray-400 font-medium">No Image</span>}
                   </div>
                   {(() => {
                     const gallery = [viewingProduct.image_url, viewingProduct.image_url_2, viewingProduct.image_url_3, viewingProduct.image_url_4].filter(Boolean) as string[];
                     if (gallery.length > 1) {
                       return (
-                        <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-2">
+                        <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-3">
                           {gallery.map((img, idx) => (
-                            <div key={idx} onClick={() => setActiveImage(img)} className={`w-20 h-20 rounded-sm cursor-pointer border-2 transition-colors duration-300 ${activeImage === img ? 'border-black' : 'border-transparent hover:border-gray-300'} bg-white flex-shrink-0 p-1 shadow-sm`}>
+                            <div key={idx} onClick={() => setActiveImage(img)} className={`w-24 h-24 rounded-sm cursor-pointer border-2 transition-all duration-300 ${activeImage === img ? 'border-[#D4AF37] shadow-md' : 'border-[#EADFC8] hover:border-[#D4AF37]/50'} bg-[#FAF5EB] flex-shrink-0 p-1`}>
                               <img src={img} className="w-full h-full object-cover rounded-sm" />
                             </div>
                           ))}
@@ -857,59 +931,56 @@ export default function Home() {
                 </div>
                 
                 <div className="w-full md:w-1/2 flex flex-col">
-                  <div className="border-b border-gray-200 pb-6 mb-8">
-                    <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest mb-3">{viewingProduct.category}</p>
-                    <h3 className="text-3xl md:text-4xl font-serif font-bold text-black mb-4 leading-tight">{viewingProduct.name}</h3>
-                    <div className="flex items-center gap-5">
-                      <span className="text-black text-4xl font-black tracking-tight">{formatPrice(viewingProduct.price)} ৳</span>
+                  <div className="border-b border-[#EADFC8] pb-6 mb-8">
+                    <p className="font-bold text-[10px] uppercase tracking-[0.2em] mb-4" style={{ color: storeSettings.heading_color || '#B8860B' }}>{viewingProduct.category}</p>
+                    <h3 className="text-3xl md:text-4xl font-bold text-[#111412] mb-5 leading-tight">{viewingProduct.name}</h3>
+                    <div className="flex items-center gap-6">
+                      <span className="text-[#B8860B] text-4xl font-black tracking-tight">{formatPrice(viewingProduct.price)} ৳</span>
                       {viewingProduct.original_price && <span className="text-gray-400 line-through text-xl font-medium">{formatPrice(viewingProduct.original_price)} ৳</span>}
                     </div>
                   </div>
                   
-                  <div className="mb-8 space-y-4">
-                     <button onClick={() => handleDirectOrder(viewingProduct, 1)} disabled={!viewingProduct.in_stock} className="w-full bg-[#222] text-white font-bold py-4 rounded-sm hover:bg-black transition-colors duration-300 text-sm shadow-md flex justify-center items-center gap-2 uppercase tracking-widest">
+                  <div className="mb-10 space-y-4">
+                     <button onClick={() => handleDirectOrder(viewingProduct, 1)} disabled={!viewingProduct.in_stock} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-4.5 rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 text-sm shadow-md flex justify-center items-center gap-2 uppercase tracking-[0.2em]">
                        ⚡ অর্ডার করুন
                      </button>
-                     <button onClick={() => {addToCart(viewingProduct, 1); setIsCartOpen(true)}} disabled={!viewingProduct.in_stock} className="w-full bg-white border border-gray-400 text-black font-bold py-3.5 rounded-sm hover:bg-gray-100 transition-colors duration-300 text-sm flex justify-center items-center gap-2 uppercase tracking-wider shadow-sm">
+                     <button onClick={() => {addToCart(viewingProduct, 1); setIsCartOpen(true)}} disabled={!viewingProduct.in_stock} className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] font-bold py-4 rounded-sm hover:bg-[#EADFC8] transition-colors duration-300 text-sm flex justify-center items-center gap-2 uppercase tracking-[0.2em] shadow-sm">
                        🛒 ব্যাগে যোগ
                      </button>
-                     <a href={`https://wa.me/88${storeSettings.phone}?text=আমি ${viewingProduct.name} অর্ডার করতে চাই`} target="_blank" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#1ebd5a] transition-colors duration-300 text-sm shadow-sm flex justify-center items-center gap-2 uppercase tracking-wider">
-                       🟢 হোয়াটসঅ্যাপ অর্ডার
-                     </a>
                   </div>
                   
                   <div className="mt-2 text-gray-700">
-                    <h4 className="text-sm font-bold text-black mb-3 uppercase tracking-widest border-b border-gray-200 pb-2 inline-block">Product Details</h4>
-                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap font-medium text-gray-600">{viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।"}</p>
+                    <h4 className="text-xs font-bold mb-4 uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2 inline-block" style={{ color: storeSettings.heading_color || '#B8860B' }}>Product Details</h4>
+                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap font-medium" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।"}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-10 mt-12">
-                 <h3 className="text-2xl font-serif font-bold text-black mb-8 border-l-4 border-black pl-4 uppercase tracking-widest">কাস্টমার রিভিউ ({productReviews.length})</h3>
+              <div className="border-t border-[#EADFC8] pt-12 mt-16">
+                 <h3 className="text-2xl font-bold mb-10 border-l-4 border-[#D4AF37] pl-5 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>কাস্টমার রিভিউ ({productReviews.length})</h3>
                  
                  <div className="flex flex-col md:flex-row gap-10">
-                   <form onSubmit={handleReviewSubmit} className="w-full md:w-1/3 bg-[#F9F9F9] p-8 rounded-sm border border-gray-200 shadow-sm h-fit">
-                      <h4 className="text-sm font-bold text-black mb-5 uppercase tracking-widest">আপনার মতামত জানান</h4>
-                      <div className="flex gap-2 mb-5">
+                   <form onSubmit={handleReviewSubmit} className="w-full md:w-1/3 bg-[#FAF5EB] p-8 rounded-sm border border-[#EADFC8] shadow-sm h-fit">
+                      <h4 className="text-xs font-bold mb-6 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>আপনার মতামত জানান</h4>
+                      <div className="flex gap-2 mb-6">
                          {[1,2,3,4,5].map(star => (
-                            <span key={star} onClick={() => setNewReviewRating(star)} className={`cursor-pointer text-3xl transition-colors ${star <= newReviewRating ? 'text-[#FFD700]' : 'text-gray-300 hover:text-gray-400'}`}>★</span>
+                            <span key={star} onClick={() => setNewReviewRating(star)} className={`cursor-pointer text-3xl transition-colors ${star <= newReviewRating ? 'text-[#D4AF37]' : 'text-gray-300 hover:text-[#D4AF37]/50'}`}>★</span>
                          ))}
                       </div>
-                      <input type="text" placeholder="আপনার নাম" value={newReviewName} onChange={e => setNewReviewName(e.target.value)} className="w-full bg-white border border-gray-300 p-3 rounded-sm text-sm text-black mb-4 outline-none focus:border-black transition-colors shadow-inner" required/>
-                      <textarea required placeholder="প্রোডাক্টটি কেমন লেগেছে?" value={newReviewComment} onChange={e => setNewReviewComment(e.target.value)} className="w-full bg-white border border-gray-300 p-3 rounded-sm text-sm text-black mb-5 outline-none focus:border-black transition-colors custom-scrollbar shadow-inner" rows={4}></textarea>
-                      <button type="submit" disabled={isReviewSubmitting} className="w-full bg-black text-white py-3.5 rounded-sm text-sm font-bold hover:bg-gray-800 transition-colors duration-300 shadow-sm tracking-widest uppercase">{isReviewSubmitting ? 'Submitting...' : 'Submit Review'}</button>
+                      <input type="text" placeholder="আপনার নাম" value={newReviewName} onChange={e => setNewReviewName(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-4 outline-none focus:border-[#D4AF37] transition-colors shadow-inner" required/>
+                      <textarea required placeholder="প্রোডাক্টটি কেমন লেগেছে?" value={newReviewComment} onChange={e => setNewReviewComment(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-6 outline-none focus:border-[#D4AF37] transition-colors custom-scrollbar shadow-inner" rows={4}></textarea>
+                      <button type="submit" disabled={isReviewSubmitting} className="w-full bg-[#111412] text-[#D4AF37] py-4 rounded-sm text-xs font-bold hover:bg-[#D4AF37] hover:text-[#111412] border border-[#D4AF37] transition-colors duration-300 shadow-sm tracking-[0.2em] uppercase">{isReviewSubmitting ? 'Submitting...' : 'Submit Review'}</button>
                    </form>
 
-                   <div className="w-full md:w-2/3 space-y-5 max-h-[400px] overflow-y-auto custom-scrollbar pr-3">
-                      {productReviews.length === 0 ? <p className="text-sm text-gray-500 bg-[#F9F9F9] p-10 text-center border border-dashed border-gray-300 rounded-sm font-medium tracking-wide uppercase">এখনো কোনো রিভিউ নেই। আপনিই প্রথম রিভিউ দিন!</p> : productReviews.map(review => (
-                         <div key={review.id} className="bg-white border border-gray-200 p-6 rounded-sm shadow-sm hover:border-gray-400 transition-colors duration-300">
-                            <div className="flex justify-between items-center mb-3">
-                               <span className="font-bold text-sm text-black uppercase tracking-wider">{review.customer_name}</span>
-                               <span className="text-[#FFD700] text-lg tracking-widest">{'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}</span>
+                   <div className="w-full md:w-2/3 space-y-6 max-h-[450px] overflow-y-auto custom-scrollbar pr-4">
+                      {productReviews.length === 0 ? <p className="text-xs text-gray-500 bg-[#FAF5EB] p-12 text-center border border-dashed border-[#D4AF37]/50 rounded-sm font-bold tracking-[0.2em] uppercase">এখনো কোনো রিভিউ নেই। আপনিই প্রথম রিভিউ দিন!</p> : productReviews.map(review => (
+                         <div key={review.id} className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
+                            <div className="flex justify-between items-center mb-4">
+                               <span className="font-bold text-sm text-[#111412] uppercase tracking-[0.1em]">{review.customer_name}</span>
+                               <span className="text-[#D4AF37] text-lg tracking-widest">{'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}</span>
                             </div>
-                            <p className="text-sm text-gray-600 mb-3 font-medium leading-relaxed">{review.comment}</p>
-                            <p className="text-[10px] text-gray-400 font-bold tracking-widest uppercase">{new Date(review.created_at).toLocaleDateString()}</p>
+                            <p className="text-sm mb-4 font-medium leading-relaxed" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{review.comment}</p>
+                            <p className="text-[10px] text-[#B8860B] font-bold tracking-[0.2em] uppercase">{new Date(review.created_at).toLocaleDateString()}</p>
                          </div>
                       ))}
                    </div>
@@ -921,92 +992,91 @@ export default function Home() {
       )}
 
       {isCheckoutOpen && (
-        <div className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-300 w-full max-w-md relative rounded-sm shadow-2xl flex flex-col overflow-hidden max-h-[95vh]">
-            <div className="flex justify-between items-center bg-[#F9F9F9] border-b border-gray-200 p-4">
-               <button onClick={() => setIsCheckoutOpen(false)} className="flex items-center gap-2 text-black font-bold uppercase tracking-widest text-xs transition-colors bg-white border border-gray-300 hover:bg-gray-100 px-3 py-1.5 rounded-sm shadow-sm"><span className="text-lg leading-none -mt-0.5">←</span> Back</button>
-               <h3 className="text-[15px] font-bold text-black tracking-widest uppercase">হোম ডেলিভারির তথ্য</h3>
-               <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-red-500 text-2xl font-light transition-colors">✕</button>
+        <div className="fixed inset-0 z-[280] bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-[#D4AF37] w-full max-w-md relative rounded-sm shadow-2xl flex flex-col overflow-hidden max-h-[95vh]">
+            <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-5">
+               <button onClick={() => setIsCheckoutOpen(false)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#EADFC8] hover:border-[#D4AF37] px-3 py-1.5 rounded-sm shadow-sm"><span className="text-lg leading-none -mt-0.5">←</span> Back</button>
+               <h3 className="text-[13px] font-bold text-[#B8860B] tracking-[0.2em] uppercase">হোম ডেলিভারির তথ্য</h3>
+               <button onClick={() => setIsCheckoutOpen(false)} className="text-[#111412] hover:text-red-500 text-2xl font-light transition-colors">✕</button>
             </div>
             
             <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
-              <form onSubmit={handleCheckoutSubmit} className="space-y-5">
+              <form onSubmit={handleCheckoutSubmit} className="space-y-6">
                 <div>
-                  <label className="text-[11px] font-bold text-gray-600 mb-2 flex items-center gap-2 uppercase tracking-wider">👤 আপনার নাম লিখুন <span className="text-red-500">*</span></label>
-                  <input required value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 p-3 text-sm text-black rounded-sm outline-none focus:border-black shadow-inner transition-colors"/>
+                  <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">👤 আপনার নাম লিখুন <span className="text-red-500">*</span></label>
+                  <input required value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-gray-600 mb-2 flex items-center gap-2 uppercase tracking-wider">📱 মোবাইল নাম্বার <span className="text-red-500">*</span></label>
-                  <input required placeholder="01xxxxxxxxx" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 p-3 text-sm text-black rounded-sm outline-none focus:border-black shadow-inner transition-colors"/>
+                  <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">📱 মোবাইল নাম্বার <span className="text-red-500">*</span></label>
+                  <input required placeholder="01xxxxxxxxx" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-gray-600 mb-2 flex items-center gap-2 uppercase tracking-wider">🏠 ডেলিভারি ঠিকানা <span className="text-red-500">*</span></label>
-                  <textarea required rows={2} placeholder="সম্পূর্ণ ঠিকানা লিখুন (জেলা, থানা সহ)" value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 p-3 text-sm text-black rounded-sm outline-none focus:border-black shadow-inner custom-scrollbar transition-colors"></textarea>
+                  <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">🏠 ডেলিভারি ঠিকানা <span className="text-red-500">*</span></label>
+                  <textarea required rows={2} placeholder="সম্পূর্ণ ঠিকানা লিখুন (জেলা, থানা সহ)" value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner custom-scrollbar transition-colors"></textarea>
                 </div>
                 
-                <div className="bg-[#F9F9F9] p-4 border border-gray-200 rounded-sm shadow-sm">
-                  <label className="text-[11px] font-bold text-gray-600 mb-3 flex items-center gap-2 uppercase tracking-wider">💳 পেমেন্ট পদ্ধতি</label>
-                  <div className="flex flex-wrap gap-2">
-                     <button type="button" onClick={()=>setPaymentMethod('COD')} className={`flex-1 min-w-[100px] py-2.5 text-xs font-bold border rounded-sm transition-colors duration-300 ${paymentMethod==='COD'?'bg-black text-white border-black':'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>Cash on Delivery</button>
-                     <button type="button" onClick={()=>setPaymentMethod('bKash')} className={`flex-1 min-w-[80px] py-2.5 text-xs font-bold border rounded-sm transition-colors duration-300 ${paymentMethod==='bKash'?'bg-[#e2136e] text-white border-[#e2136e]':'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>bKash</button>
-                     <button type="button" onClick={()=>setPaymentMethod('Nagad')} className={`flex-1 min-w-[80px] py-2.5 text-xs font-bold border rounded-sm transition-colors duration-300 ${paymentMethod==='Nagad'?'bg-[#F58220] text-white border-[#F58220]':'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>Nagad</button>
-                     <button type="button" onClick={()=>setPaymentMethod('Rocket')} className={`flex-1 min-w-[80px] py-2.5 text-xs font-bold border rounded-sm transition-colors duration-300 ${paymentMethod==='Rocket'?'bg-[#8C1515] text-white border-[#8C1515]':'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>Rocket</button>
+                <div className="bg-[#FAF5EB] p-5 border border-[#EADFC8] rounded-sm shadow-sm">
+                  <label className="text-[10px] font-bold text-[#B8860B] mb-4 flex items-center gap-2 uppercase tracking-[0.2em]">💳 পেমেন্ট পদ্ধতি</label>
+                  <div className="flex flex-wrap gap-2.5">
+                     <button type="button" onClick={()=>setPaymentMethod('COD')} className={`flex-1 min-w-[100px] py-3 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod==='COD'?'bg-[#111412] text-[#D4AF37] border-[#D4AF37]':'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>Cash on Delivery</button>
+                     <button type="button" onClick={()=>setPaymentMethod('bKash')} className={`flex-1 min-w-[80px] py-3 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod==='bKash'?'bg-[#e2136e] text-white border-[#e2136e]':'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>bKash</button>
+                     <button type="button" onClick={()=>setPaymentMethod('Nagad')} className={`flex-1 min-w-[80px] py-3 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod==='Nagad'?'bg-[#F58220] text-white border-[#F58220]':'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>Nagad</button>
                   </div>
                   {paymentMethod !== 'COD' && (
-                     <div className="bg-white border border-gray-300 p-4 rounded-sm mt-3 shadow-inner">
-                         <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider leading-relaxed">এই নম্বরে Send Money করুন: <br/><span className="text-lg text-black bg-gray-100 px-2 py-0.5 rounded tracking-widest inline-block mt-1 border border-gray-200">{storeSettings.phone}</span> ({paymentMethod})</p>
-                         <input type="text" required placeholder={`${paymentMethod} TrxID দিন`} value={transactionId} onChange={e=>setTransactionId(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 p-3 text-sm text-black rounded-sm outline-none focus:border-black shadow-inner transition-colors mt-2"/>
+                     <div className="bg-white border border-[#EADFC8] p-5 rounded-sm mt-4 shadow-inner">
+                         <p className="text-[10px] font-bold text-[#111412] mb-3 uppercase tracking-[0.2em] leading-relaxed">এই নম্বরে Send Money করুন: <br/><span className="text-xl text-[#D4AF37] bg-[#111412] px-3 py-1 rounded-sm tracking-[0.2em] inline-block mt-2 border border-[#D4AF37]">{storeSettings.phone}</span></p>
+                         <input type="text" required placeholder={`${paymentMethod} TrxID দিন`} value={transactionId} onChange={e=>setTransactionId(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors mt-2"/>
                      </div>
                   )}
                 </div>
 
-                <div className="pt-1">
-                  <label className="text-[11px] font-bold text-gray-600 mb-3 flex items-center gap-2 uppercase tracking-wider">🚚 ডেলিভারি চার্জ</label>
-                  <div className="flex flex-col gap-3 bg-[#F9F9F9] p-4 rounded-sm border border-gray-200 shadow-sm">
-                     <label className="flex items-center gap-3 text-sm text-gray-800 font-bold cursor-pointer">
-                        <input type="radio" name="shipping" checked={shippingLocation==='inside'} onChange={()=>setShippingLocation('inside')} className="accent-black w-4 h-4 cursor-pointer" />
+                <div className="pt-2">
+                  <label className="text-[10px] font-bold text-[#B8860B] mb-3 flex items-center gap-2 uppercase tracking-[0.2em]">🚚 ডেলিভারি চার্জ</label>
+                  <div className="flex flex-col gap-3 bg-[#FAF5EB] p-5 rounded-sm border border-[#EADFC8] shadow-sm">
+                     <label className="flex items-center gap-3 text-sm text-[#111412] font-bold cursor-pointer">
+                        <input type="radio" name="shipping" checked={shippingLocation==='inside'} onChange={()=>setShippingLocation('inside')} className="accent-[#D4AF37] w-4 h-4 cursor-pointer" />
                         <span>ঢাকার ভিতরে (৳ ৬০)</span>
                      </label>
-                     <label className="flex items-center gap-3 text-sm text-gray-800 font-bold cursor-pointer">
-                        <input type="radio" name="shipping" checked={shippingLocation==='outside'} onChange={()=>setShippingLocation('outside')} className="accent-black w-4 h-4 cursor-pointer" />
+                     <label className="flex items-center gap-3 text-sm text-[#111412] font-bold cursor-pointer">
+                        <input type="radio" name="shipping" checked={shippingLocation==='outside'} onChange={()=>setShippingLocation('outside')} className="accent-[#D4AF37] w-4 h-4 cursor-pointer" />
                         <span>ঢাকার বাইরে (৳ ১২০)</span>
                      </label>
                   </div>
                 </div>
 
-                <div className="border border-gray-300 bg-white rounded-sm mt-5 overflow-hidden shadow-sm">
+                <div className="border border-[#EADFC8] bg-white rounded-sm mt-6 overflow-hidden shadow-sm">
                    {cart.map((item) => (
-                     <div key={item.id} className="flex border-b border-gray-200 last:border-0 p-3 items-center text-sm">
-                        <div className="w-14 h-14 border border-gray-200 mr-4 shrink-0 rounded-sm overflow-hidden bg-[#F9F9F9]">
+                     <div key={item.id} className="flex border-b border-[#EADFC8] last:border-0 p-3 items-center text-sm">
+                        <div className="w-16 h-16 border border-[#EADFC8] mr-4 shrink-0 rounded-sm overflow-hidden bg-[#FAF5EB]">
                            <img src={item.image_url||''} className="w-full h-full object-cover"/>
                         </div>
                         <div className="flex-1 leading-tight">
-                           <p className="font-bold text-gray-800 text-[13px] line-clamp-1">{item.name}</p>
-                           <p className="text-[11px] text-black font-black mt-1">৳ {formatPrice(item.price)} X {item.quantity}</p>
+                           <p className="font-bold text-[#111412] text-[13px] line-clamp-1">{item.name}</p>
+                           <p className="text-[11px] text-[#B8860B] font-black mt-1.5">৳ {formatPrice(item.price)} X {item.quantity}</p>
                         </div>
-                        <div className="flex flex-col items-center border-l border-r border-gray-200 px-3 h-full justify-center gap-1.5 bg-gray-50">
-                           <button type="button" onClick={()=>updateQuantity(item.id, 1)} className="font-black text-xl leading-none cursor-pointer text-gray-600 hover:text-black transition-colors">+</button>
-                           <span className="text-xs font-bold text-black leading-none">{item.quantity}</span>
-                           <button type="button" onClick={()=>updateQuantity(item.id, -1)} className="font-black text-xl leading-none cursor-pointer text-gray-600 hover:text-black transition-colors">-</button>
+                        <div className="flex flex-col items-center border-l border-r border-[#EADFC8] px-3 h-full justify-center gap-2 bg-[#FAF5EB]">
+                           <button type="button" onClick={()=>updateQuantity(item.id, 1)} className="font-black text-xl leading-none cursor-pointer text-[#111412] hover:text-[#D4AF37] transition-colors">+</button>
+                           <span className="text-xs font-bold text-[#111412] leading-none">{item.quantity}</span>
+                           <button type="button" onClick={()=>updateQuantity(item.id, -1)} className="font-black text-xl leading-none cursor-pointer text-[#111412] hover:text-[#D4AF37] transition-colors">-</button>
                         </div>
-                        <div className="px-4 flex items-center justify-between min-w-[80px]">
-                           <span className="font-black text-black text-sm">{(getNumericPrice(item.price) * item.quantity).toString()}৳</span>
+                        <div className="px-4 flex items-center justify-between min-w-[90px]">
+                           <span className="font-black text-[#111412] text-sm">{(getNumericPrice(item.price) * item.quantity).toString()}৳</span>
                            <button type="button" onClick={()=>removeFromCart(item.id)} className="text-red-500 font-bold ml-3 hover:bg-red-50 px-2 py-1 rounded-sm transition-colors text-lg leading-none">✕</button>
                         </div>
                      </div>
                    ))}
                    
-                   <div className="flex justify-between items-center p-4 bg-[#F9F9F9] border-t border-gray-300 font-bold text-sm text-black">
-                      <span className="uppercase tracking-widest text-gray-600">Total:-</span>
+                   <div className="flex justify-between items-center p-5 bg-[#FAF5EB] border-t border-[#EADFC8] font-bold text-sm text-[#111412]">
+                      <span className="uppercase tracking-[0.2em] text-[#B8860B] text-xs">Total:-</span>
                       <div className="flex items-center gap-8 pr-1">
-                        <span className="text-lg text-gray-500">{totalItemsCount} items</span>
-                        <span className="text-black text-[18px] font-black">{cartTotal.toString()} ৳</span>
+                        <span className="text-sm text-gray-600">{totalItemsCount} items</span>
+                        <span className="text-[#111412] text-[18px] font-black">{cartTotal.toString()} ৳</span>
                       </div>
                    </div>
                 </div>
 
-                <button type="submit" disabled={isCheckingOut} className="w-full bg-[#222] text-white font-bold py-4 text-[17px] rounded-sm mt-6 hover:bg-black transition-colors duration-300 shadow-md flex items-center justify-center gap-2 uppercase tracking-widest">
-                  {isCheckingOut ? "Processing..." : `✅ অর্ডার করুন ৳ ${cartTotal}`}
+                <button type="submit" disabled={isCheckingOut} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-4.5 text-[15px] rounded-sm mt-8 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 shadow-md flex items-center justify-center gap-2 uppercase tracking-[0.2em]">
+                  {isCheckingOut ? "Processing..." : `অর্ডার করুন ৳ ${cartTotal}`}
                 </button>
               </form>
             </div>
@@ -1015,35 +1085,35 @@ export default function Home() {
       )}
 
       {isCartOpen && (
-        <div className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-sm flex justify-end">
-          <div className="bg-white w-full max-w-sm h-full p-8 relative flex flex-col shadow-2xl border-l border-gray-300">
-            <button onClick={() => setIsCartOpen(false)} className="absolute top-5 right-6 text-3xl text-gray-400 hover:text-black transition-colors leading-none">✕</button>
-            <h3 className="text-2xl font-serif font-bold mb-8 border-b border-gray-200 pb-4 text-black tracking-widest uppercase">শপিং ব্যাগ</h3>
+        <div className="fixed inset-0 z-[280] bg-[#111412]/80 backdrop-blur-sm flex justify-end">
+          <div className="bg-white w-full max-w-sm h-full p-8 relative flex flex-col shadow-2xl border-l-4 border-[#D4AF37]">
+            <button onClick={() => setIsCartOpen(false)} className="absolute top-6 right-6 text-3xl text-gray-400 hover:text-[#111412] transition-colors leading-none">✕</button>
+            <h3 className="text-xl font-bold mb-8 border-b border-[#EADFC8] pb-5 text-[#B8860B] tracking-[0.2em] uppercase">শপিং ব্যাগ</h3>
             
             <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
               {cart.map(item => (
-                <div key={item.id} className="flex items-center justify-between bg-[#F9F9F9] p-4 rounded-sm border border-gray-200 shadow-sm hover:border-gray-300 transition-colors duration-300">
+                <div key={item.id} className="flex items-center justify-between bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
                   <div className="flex gap-4 items-center w-2/3">
-                    <img src={item.image_url||''} className="w-16 h-16 border border-gray-300 bg-white rounded-sm object-cover shrink-0"/>
-                    <div><p className="text-[13px] font-bold text-black leading-tight line-clamp-2">{item.name}</p><p className="text-xs font-black mt-2 text-gray-700">{formatPrice(item.price)} x {item.quantity}</p></div>
+                    <img src={item.image_url||''} className="w-16 h-16 border border-[#EADFC8] bg-white rounded-sm object-cover shrink-0"/>
+                    <div><p className="text-[12px] font-bold text-[#111412] leading-tight line-clamp-2">{item.name}</p><p className="text-[11px] font-black mt-2 text-[#B8860B]">{formatPrice(item.price)} x {item.quantity}</p></div>
                   </div>
                   <div className="flex flex-col items-end gap-3">
-                      <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-[10px] font-bold hover:underline uppercase tracking-wider">Remove</button>
-                      <div className="flex items-center border border-gray-300 rounded-sm bg-white overflow-hidden shadow-sm">
-                        <button onClick={() => updateQuantity(item.id, -1)} className="px-3 py-1 font-bold text-gray-600 hover:bg-gray-100 transition-colors">-</button>
-                        <span className="px-3 text-xs font-bold border-x border-gray-300 py-1.5 text-black bg-[#F9F9F9]">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, 1)} className="px-3 py-1 font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+                      <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-[9px] font-bold hover:underline uppercase tracking-wider">Remove</button>
+                      <div className="flex items-center border border-[#EADFC8] rounded-sm bg-white overflow-hidden shadow-sm">
+                        <button onClick={() => updateQuantity(item.id, -1)} className="px-3 py-1 font-bold text-[#111412] hover:bg-[#FAF5EB] transition-colors">-</button>
+                        <span className="px-3 text-xs font-bold border-x border-[#EADFC8] py-1.5 text-[#111412] bg-[#FAF5EB]">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, 1)} className="px-3 py-1 font-bold text-[#111412] hover:bg-[#FAF5EB] transition-colors">+</button>
                       </div>
                   </div>
                 </div>
               ))}
-              {cart.length === 0 && <p className="text-center text-gray-500 mt-12 font-bold tracking-widest uppercase text-sm border border-dashed border-gray-300 p-6 rounded-sm">ব্যাগটি সম্পূর্ণ খালি!</p>}
+              {cart.length === 0 && <p className="text-center text-gray-500 mt-16 font-bold tracking-[0.2em] uppercase text-xs border border-dashed border-[#D4AF37]/50 p-8 rounded-sm bg-[#FAF5EB]">ব্যাগটি সম্পূর্ণ খালি!</p>}
             </div>
 
             {cart.length > 0 && (
-              <div className="mt-6 bg-[#F9F9F9] p-6 rounded-sm shadow-sm border border-gray-300">
-                <div className="flex justify-between font-black text-xl mb-6 text-black border-b border-gray-300 pb-4"><span className="uppercase tracking-widest text-sm text-gray-600">সাবটোটাল:</span><span>{itemsSubtotal} ৳</span></div>
-                <button onClick={() => {setIsCartOpen(false); setIsCheckoutOpen(true)}} className="w-full bg-[#222] text-white font-bold py-4 text-sm rounded-sm hover:bg-black transition-colors duration-300 tracking-widest uppercase shadow-md">চেকআউট করুন</button>
+              <div className="mt-6 bg-[#FAF5EB] p-6 rounded-sm shadow-sm border border-[#EADFC8]">
+                <div className="flex justify-between font-black text-xl mb-6 text-[#111412] border-b border-[#EADFC8] pb-4"><span className="uppercase tracking-[0.2em] text-[11px] text-[#B8860B] mt-1">সাবটোটাল:</span><span>{itemsSubtotal} ৳</span></div>
+                <button onClick={() => {setIsCartOpen(false); setIsCheckoutOpen(true)}} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-4 text-xs rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md">চেকআউট করুন</button>
               </div>
             )}
           </div>
@@ -1051,24 +1121,24 @@ export default function Home() {
       )}
 
       {isWishlistOpen && (
-        <div className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-sm flex justify-end">
-          <div className="bg-white w-full max-w-sm h-full p-8 relative shadow-2xl flex flex-col border-l border-gray-300">
-            <button onClick={() => setIsWishlistOpen(false)} className="absolute top-5 right-6 text-gray-400 hover:text-black text-3xl transition-colors leading-none">✕</button>
-            <h3 className="text-2xl font-serif font-bold mb-8 border-b border-gray-200 pb-4 text-black tracking-widest uppercase">উইশলিস্ট ({wishlist.length})</h3>
+        <div className="fixed inset-0 z-[280] bg-[#111412]/80 backdrop-blur-sm flex justify-end">
+          <div className="bg-white w-full max-w-sm h-full p-8 relative shadow-2xl flex flex-col border-l-4 border-[#D4AF37]">
+            <button onClick={() => setIsWishlistOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-[#111412] text-3xl transition-colors leading-none">✕</button>
+            <h3 className="text-xl font-bold mb-8 border-b border-[#EADFC8] pb-5 text-[#B8860B] tracking-[0.2em] uppercase">উইশলিস্ট ({wishlist.length})</h3>
             
             <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
-              {wishlist.length === 0 ? <p className="text-center text-gray-500 mt-12 font-bold tracking-widest uppercase text-sm border border-dashed border-gray-300 p-6 rounded-sm">উইশলিস্টে কিছু নেই।</p> : wishlist.map(item => (
-                <div key={item.id} className="flex justify-between items-center bg-[#F9F9F9] p-4 rounded-sm border border-gray-200 shadow-sm hover:border-gray-300 transition-colors duration-300">
+              {wishlist.length === 0 ? <p className="text-center text-gray-500 mt-16 font-bold tracking-[0.2em] uppercase text-xs border border-dashed border-[#D4AF37]/50 p-8 rounded-sm bg-[#FAF5EB]">উইশলিস্টে কিছু নেই।</p> : wishlist.map(item => (
+                <div key={item.id} className="flex justify-between items-center bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
                   <div className="flex items-center gap-4">
-                    <img src={item.image_url||''} className="w-16 h-16 border border-gray-300 bg-white object-cover rounded-sm shadow-sm"/>
+                    <img src={item.image_url||''} className="w-16 h-16 border border-[#EADFC8] bg-white object-cover rounded-sm shadow-sm"/>
                     <div>
-                      <p className="text-[13px] font-bold text-black leading-tight line-clamp-2">{item.name}</p>
-                      <p className="text-gray-700 text-sm font-black mt-2">{formatPrice(item.price)} ৳</p>
+                      <p className="text-[12px] font-bold text-[#111412] leading-tight line-clamp-2">{item.name}</p>
+                      <p className="text-[#B8860B] text-xs font-black mt-2">{formatPrice(item.price)} ৳</p>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-3 items-end">
-                     <button onClick={() => { addToCart(item); setIsWishlistOpen(false); setIsCartOpen(true); }} className="bg-[#222] text-white text-[10px] px-3 py-2 rounded-sm font-bold hover:bg-black transition-colors uppercase tracking-widest shadow-sm">🛒 ব্যাগে</button>
-                     <button onClick={() => removeFromWishlist(item.id)} className="text-red-500 text-[10px] font-bold hover:underline uppercase tracking-wider text-center">Remove</button>
+                  <div className="flex flex-col gap-4 items-end">
+                     <button onClick={() => { addToCart(item); setIsWishlistOpen(false); setIsCartOpen(true); }} className="bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[9px] px-3 py-2 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors uppercase tracking-[0.2em] shadow-sm">🛒 ব্যাগে</button>
+                     <button onClick={() => removeFromWishlist(item.id)} className="text-red-500 text-[9px] font-bold hover:underline uppercase tracking-wider text-center">Remove</button>
                   </div>
                 </div>
               ))}
@@ -1078,55 +1148,55 @@ export default function Home() {
       )}
 
       {showAuthModal && (
-        <div className="fixed inset-0 z-[300] bg-black/60 flex flex-col items-center justify-center p-4 backdrop-blur-sm">
-          <button onClick={() => setShowAuthModal(false)} className="bg-white text-black px-6 py-2.5 rounded-sm font-bold text-xs mb-6 hover:bg-gray-100 transition-colors shadow-lg border border-gray-300">
+        <div className="fixed inset-0 z-[300] bg-[#111412]/80 flex flex-col items-center justify-center p-4 backdrop-blur-md">
+          <button onClick={() => setShowAuthModal(false)} className="bg-white text-[#111412] px-6 py-3 rounded-sm font-bold text-xs mb-8 hover:bg-[#FAF5EB] transition-colors shadow-lg border border-[#EADFC8] uppercase tracking-widest">
             লগ-ইন ছাড়া অর্ডার করতে চাইলে এখানে ক্লিক করুন &gt;&gt;
           </button>
 
-          <div className="bg-white p-8 md:p-10 rounded-sm shadow-2xl w-full max-w-md relative border-t-4 border-black">
-            <button onClick={() => setShowAuthModal(false)} className="absolute top-5 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
+          <div className="bg-white p-8 md:p-12 rounded-sm shadow-2xl w-full max-w-md relative border-t-4 border-[#D4AF37]">
+            <button onClick={() => setShowAuthModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
 
             {authView === 'OTP' && (
               <>
-                <div className="bg-[#F9F9F9] border-l-4 border-[#25D366] p-6 rounded-sm mb-6 shadow-sm mt-2">
+                <div className="bg-[#FAF5EB] border-l-4 border-[#D4AF37] p-8 rounded-sm mb-8 shadow-sm mt-2">
                   {!otpSent ? (
-                      <form onSubmit={handleSendOTP} className="space-y-4">
-                         <input required type="tel" placeholder="মোবাইল নাম্বার লিখুন (e.g., 01xxxxxxxxx)" value={authPhone} onChange={e=>setAuthPhone(e.target.value)} className="w-full bg-white border border-gray-300 p-3.5 rounded-sm text-sm text-black outline-none focus:border-[#25D366] transition-colors"/>
-                         <div className="flex items-center gap-3">
-                            <span className="text-gray-700 font-mono font-bold text-lg min-w-[80px]">{captcha.num1} + {captcha.num2} = </span>
-                            <input required type="number" placeholder="যোগফল লিখুন" value={userCaptcha} onChange={e=>setUserCaptcha(e.target.value)} className="w-full bg-white border border-gray-300 p-3.5 rounded-sm text-sm text-black outline-none focus:border-[#25D366] transition-colors"/>
+                      <form onSubmit={handleSendOTP} className="space-y-5">
+                         <input required type="tel" placeholder="মোবাইল নাম্বার (e.g., 01xxxxxxxxx)" value={authPhone} onChange={e=>setAuthPhone(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] transition-colors"/>
+                         <div className="flex items-center gap-4">
+                            <span className="text-[#B8860B] font-mono font-bold text-lg min-w-[80px]">{captcha.num1} + {captcha.num2} = </span>
+                            <input required type="number" placeholder="যোগফল লিখুন" value={userCaptcha} onChange={e=>setUserCaptcha(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] transition-colors"/>
                          </div>
-                         <button type="submit" disabled={authLoading} className="w-full bg-black text-white py-3.5 rounded-sm font-bold hover:bg-gray-800 transition-colors duration-300 tracking-widest mt-2 shadow-sm">{authLoading ? 'অপেক্ষা করুন...' : 'OTP পাঠান'}</button>
+                         <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] mt-3 shadow-sm uppercase">{authLoading ? 'অপেক্ষা করুন...' : 'OTP পাঠান'}</button>
                       </form>
                   ) : (
-                      <form onSubmit={handleVerifyOTP} className="space-y-4">
-                         <input required type="text" placeholder="OTP কোড লিখুন" value={authOtpCode} onChange={e=>setAuthOtpCode(e.target.value)} className="w-full bg-white border border-gray-300 p-3.5 rounded-sm text-sm text-black outline-none focus:border-[#25D366] transition-colors"/>
-                         <button type="submit" disabled={authLoading} className="w-full bg-[#25D366] text-white py-3.5 rounded-sm font-bold hover:bg-[#1ebd5a] transition-colors duration-300 tracking-widest mt-2 shadow-sm">{authLoading ? 'অপেক্ষা করুন...' : 'ভেরিফাই করুন'}</button>
+                      <form onSubmit={handleVerifyOTP} className="space-y-5">
+                         <input required type="text" placeholder="OTP কোড লিখুন" value={authOtpCode} onChange={e=>setAuthOtpCode(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] transition-colors"/>
+                         <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] mt-3 shadow-sm uppercase">{authLoading ? 'অপেক্ষা করুন...' : 'ভেরিফাই করুন'}</button>
                       </form>
                   )}
                 </div>
 
-                <div className="text-center text-gray-500 text-xs mb-5 font-bold tracking-widest">OR,</div>
+                <div className="text-center text-[#B8860B] text-[10px] mb-6 font-bold tracking-[0.2em]">OR,</div>
                 
-                <button onClick={() => setAuthView('PASSWORD')} className="w-full bg-white border border-gray-300 text-black py-3 rounded-sm font-bold text-sm hover:bg-gray-100 transition-colors mb-4 flex items-center justify-center gap-2 shadow-sm">
-                  ⚡ অ্যাকাউন্ট থাকলে পাসওয়ার্ড দিয়ে লগইন করুন
+                <button onClick={() => setAuthView('PASSWORD')} className="w-full bg-white border border-[#EADFC8] text-[#111412] py-4 rounded-sm font-bold text-[11px] hover:bg-[#FAF5EB] transition-colors mb-4 flex items-center justify-center gap-2 shadow-sm tracking-widest uppercase">
+                  ⚡ পাসওয়ার্ড দিয়ে লগইন করুন
                 </button>
               </>
             )}
 
             {(authView === 'PASSWORD' || authView === 'REGISTER') && (
               <>
-                <h2 className="text-3xl font-serif font-bold mb-8 text-black text-center tracking-widest uppercase mt-4">{authView === 'PASSWORD' ? 'পাসওয়ার্ড লগইন' : 'রেজিস্টার'}</h2>
+                <h2 className="text-2xl font-bold mb-8 text-[#B8860B] text-center tracking-[0.2em] uppercase mt-2">{authView === 'PASSWORD' ? 'পাসওয়ার্ড লগইন' : 'রেজিস্টার'}</h2>
                 <form onSubmit={handleAuth} className="space-y-5">
-                  <input type="email" required placeholder="ইমেইল এড্রেস" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 p-3.5 rounded-sm text-sm text-black outline-none focus:border-black shadow-inner transition-colors"/>
-                  <input type="password" required placeholder="পাসওয়ার্ড" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 p-3.5 rounded-sm text-sm text-black outline-none focus:border-black shadow-inner transition-colors"/>
-                  <button type="submit" disabled={authLoading} className="w-full bg-black text-white py-4 rounded-sm font-bold hover:bg-gray-800 transition-colors duration-300 tracking-widest uppercase mt-4 shadow-md">{authLoading ? 'অপেক্ষা করুন...' : (authView === 'PASSWORD' ? 'Login' : 'Register')}</button>
+                  <input type="email" required placeholder="ইমেইল এড্রেস" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+                  <input type="password" required placeholder="পাসওয়ার্ড" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+                  <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase mt-4 shadow-md text-xs">{authLoading ? 'অপেক্ষা করুন...' : (authView === 'PASSWORD' ? 'Login' : 'Register')}</button>
                 </form>
-                <p className="text-xs text-center mt-8 text-gray-500 font-medium tracking-wide">
+                <p className="text-[11px] text-center mt-8 text-gray-500 font-medium tracking-wide uppercase">
                   {authView === 'PASSWORD' ? 'অ্যাকাউন্ট নেই? ' : 'ইতিমধ্যেই অ্যাকাউন্ট আছে? '}
-                  <span className="text-black font-black cursor-pointer hover:text-gray-700 transition-colors uppercase tracking-widest border-b border-transparent hover:border-black pb-0.5 ml-1" onClick={() => setAuthView(authView === 'PASSWORD' ? 'REGISTER' : 'PASSWORD')}>{authView === 'PASSWORD' ? 'Register Now' : 'Login Here'}</span>
+                  <span className="text-[#B8860B] font-black cursor-pointer hover:text-[#111412] transition-colors uppercase tracking-[0.2em] border-b border-transparent hover:border-[#111412] pb-0.5 ml-1" onClick={() => setAuthView(authView === 'PASSWORD' ? 'REGISTER' : 'PASSWORD')}>{authView === 'PASSWORD' ? 'Register Now' : 'Login Here'}</span>
                 </p>
-                <button onClick={() => setAuthView('OTP')} className="w-full mt-6 text-gray-500 text-xs font-bold hover:text-black transition-colors uppercase tracking-widest text-center">← Back to Quick Login</button>
+                <button onClick={() => setAuthView('OTP')} className="w-full mt-8 text-gray-400 text-[10px] font-bold hover:text-[#111412] transition-colors uppercase tracking-[0.2em] text-center">← Back to Quick Login</button>
               </>
             )}
           </div>
@@ -1134,56 +1204,56 @@ export default function Home() {
       )}
 
       {showProfileModal && user && (
-        <div className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-300 p-8 rounded-sm shadow-2xl w-full max-w-md relative">
-            <button onClick={() => setShowProfileModal(false)} className="absolute top-5 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
-            <div className="flex flex-col items-center mb-8 mt-2">
-               <div className="w-24 h-24 bg-[#F9F9F9] border-2 border-black rounded-full mb-4 flex items-center justify-center text-4xl font-bold text-black overflow-hidden shadow-sm">
+        <div className="fixed inset-0 z-[280] bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-[#D4AF37] p-10 rounded-sm shadow-2xl w-full max-w-md relative">
+            <button onClick={() => setShowProfileModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
+            <div className="flex flex-col items-center mb-10 mt-2">
+               <div className="w-24 h-24 bg-[#FAF5EB] border-2 border-[#D4AF37] rounded-full mb-5 flex items-center justify-center text-4xl font-bold text-[#D4AF37] overflow-hidden shadow-sm">
                   {userData.avatar ? <img src={userData.avatar} className="w-full h-full object-cover"/> : user.email?.charAt(0).toUpperCase()}
                </div>
-               <h2 className="text-3xl font-serif font-bold text-black tracking-wide">{userData.name || user.email?.split('@')[0]}</h2>
-               <p className="text-sm text-gray-500 font-bold tracking-widest mt-1 uppercase">{user.email}</p>
+               <h2 className="text-2xl font-bold text-[#111412] tracking-[0.1em]">{userData.name || user.email?.split('@')[0]}</h2>
+               <p className="text-[10px] text-[#B8860B] font-bold tracking-[0.2em] mt-2 uppercase">{user.email}</p>
             </div>
             
-            <div className="border-t border-gray-200 pt-6 mb-6">
-               <h3 className="font-bold text-black mb-5 uppercase tracking-widest text-xs border-b border-gray-200 inline-block pb-1">Order History ({userOrders.length})</h3>
-               <div className="space-y-4 max-h-56 overflow-y-auto custom-scrollbar pr-2">
-                  {userOrders.length === 0 ? <p className="text-xs text-gray-500 text-center py-6 font-bold tracking-widest uppercase border border-dashed border-gray-300 rounded-sm">No orders yet.</p> : userOrders.map(order => (
-                     <div key={order.id} className="bg-[#F9F9F9] border border-gray-200 p-5 rounded-sm shadow-sm text-sm">
-                        <div className="flex justify-between font-bold mb-3">
-                           <span className="text-black uppercase tracking-wider">Order #{order.id.split('-')[0]}</span>
-                           <span className={`px-2.5 py-1 rounded-sm text-[10px] tracking-widest uppercase ${order.status === 'PENDING' ? 'text-yellow-600 bg-yellow-50 border border-yellow-200' : 'text-green-600 bg-green-50 border border-green-200'}`}>{order.status}</span>
+            <div className="border-t border-[#EADFC8] pt-8 mb-8">
+               <h3 className="font-bold text-[#B8860B] mb-6 uppercase tracking-[0.2em] text-xs border-b border-[#EADFC8] inline-block pb-2">Order History ({userOrders.length})</h3>
+               <div className="space-y-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                  {userOrders.length === 0 ? <p className="text-[10px] text-gray-500 text-center py-8 font-bold tracking-[0.2em] uppercase border border-dashed border-[#EADFC8] rounded-sm bg-[#FAF5EB]">No orders yet.</p> : userOrders.map(order => (
+                     <div key={order.id} className="bg-[#FAF5EB] border border-[#EADFC8] p-5 rounded-sm shadow-sm text-sm">
+                        <div className="flex justify-between font-bold mb-4">
+                           <span className="text-[#111412] uppercase tracking-[0.15em] text-xs">Order #{order.id.split('-')[0]}</span>
+                           <span className={`px-3 py-1 rounded-sm text-[9px] font-black tracking-[0.2em] uppercase ${order.status === 'PENDING' ? 'text-yellow-600 bg-yellow-50 border border-yellow-200' : 'text-green-600 bg-green-50 border border-green-200'}`}>{order.status}</span>
                         </div>
-                        <p className="text-gray-600 font-bold">Total: <span className="font-black text-black">৳{order.total_amount}</span></p>
-                        <p className="text-[10px] text-gray-400 mt-2 font-bold tracking-widest uppercase">{new Date(order.created_at).toLocaleString()}</p>
+                        <p className="text-gray-600 font-bold text-xs uppercase tracking-wider">Total: <span className="font-black text-[#B8860B] text-sm">৳{order.total_amount}</span></p>
+                        <p className="text-[9px] text-gray-400 mt-3 font-bold tracking-[0.2em] uppercase">{new Date(order.created_at).toLocaleString()}</p>
                      </div>
                   ))}
                </div>
             </div>
-            <button onClick={handleLogout} className="w-full bg-white text-red-600 border border-red-200 py-3.5 rounded-sm font-bold hover:bg-red-50 hover:border-red-500 transition-colors uppercase tracking-widest text-xs shadow-sm">Logout</button>
+            <button onClick={handleLogout} className="w-full bg-white text-red-600 border border-red-200 py-4 rounded-sm font-bold hover:bg-red-50 hover:border-red-500 transition-colors uppercase tracking-[0.2em] text-xs shadow-sm">Logout</button>
           </div>
         </div>
       )}
 
       {showTrackingModal && (
-        <div className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white p-8 md:p-10 rounded-sm shadow-2xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto custom-scrollbar border-t-4 border-black">
-            <button onClick={() => setShowTrackingModal(false)} className="absolute top-5 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
-            <h2 className="text-3xl font-serif font-bold mb-8 text-black tracking-widest uppercase text-center">অর্ডার ট্র্যাকিং</h2>
-            <form onSubmit={handleTrackOrder} className="flex flex-col sm:flex-row gap-3 mb-8">
-              <input type="text" required placeholder="মোবাইল নম্বর দিন" value={trackingPhone} onChange={e => setTrackingPhone(e.target.value)} className="flex-1 bg-[#F9F9F9] border border-gray-300 text-black p-3.5 rounded-sm text-sm outline-none focus:border-black shadow-inner transition-colors"/>
-              <button type="submit" className="bg-[#222] text-white px-8 py-3.5 rounded-sm font-bold shadow-md hover:bg-black transition-colors uppercase tracking-widest">{isTracking ? 'Searching...' : 'Track'}</button>
+        <div className="fixed inset-0 z-[280] bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white p-8 md:p-12 rounded-sm shadow-2xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto custom-scrollbar border-t-4 border-[#D4AF37]">
+            <button onClick={() => setShowTrackingModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
+            <h2 className="text-2xl font-bold mb-8 text-[#B8860B] tracking-[0.2em] uppercase text-center border-b border-[#EADFC8] pb-4">অর্ডার ট্র্যাকিং</h2>
+            <form onSubmit={handleTrackOrder} className="flex flex-col sm:flex-row gap-4 mb-10">
+              <input type="text" required placeholder="মোবাইল নম্বর দিন" value={trackingPhone} onChange={e => setTrackingPhone(e.target.value)} className="flex-1 bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+              <button type="submit" className="bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-8 py-4 rounded-sm font-bold shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors uppercase tracking-[0.2em] text-xs">{isTracking ? 'Searching...' : 'Track'}</button>
             </form>
             {trackedOrders && (
-              <div className="space-y-5">
-                {trackedOrders.length === 0 ? <p className="text-xs text-red-500 font-bold text-center border border-red-200 p-6 rounded-sm bg-red-50 uppercase tracking-widest">কোনো অর্ডার পাওয়া যায়নি!</p> : trackedOrders.map(order => (
-                  <div key={order.id} className="border border-gray-300 p-6 rounded-sm bg-[#F9F9F9] shadow-sm text-sm">
-                    <div className="flex justify-between font-bold border-b border-gray-200 pb-4 mb-4">
-                       <span className="text-black uppercase tracking-wider text-lg">Order ID: {order.id.split('-')[0]}</span>
-                       <span className="text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-sm text-[10px] tracking-widest uppercase">{order.status}</span>
+              <div className="space-y-6">
+                {trackedOrders.length === 0 ? <p className="text-xs text-red-500 font-bold text-center border border-red-200 p-8 rounded-sm bg-red-50 uppercase tracking-[0.2em]">কোনো অর্ডার পাওয়া যায়নি!</p> : trackedOrders.map(order => (
+                  <div key={order.id} className="border border-[#EADFC8] p-6 rounded-sm bg-[#FAF5EB] shadow-sm text-sm">
+                    <div className="flex justify-between font-bold border-b border-[#D4AF37]/30 pb-4 mb-5">
+                       <span className="text-[#111412] uppercase tracking-[0.2em] text-sm">Order: {order.id.split('-')[0]}</span>
+                       <span className="text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-sm text-[9px] font-black tracking-[0.2em] uppercase">{order.status}</span>
                     </div>
-                    <p className="font-bold text-gray-600 mb-2 uppercase tracking-wider text-xs">Amount: <span className="text-black font-black text-lg">৳{order.total_amount}</span></p>
-                    <p className="text-[10px] text-gray-500 mt-3 font-bold tracking-widest uppercase bg-white inline-block px-2 py-1 rounded-sm border border-gray-200">{new Date(order.created_at).toLocaleString()}</p>
+                    <p className="font-bold text-gray-600 mb-3 uppercase tracking-wider text-xs">Amount: <span className="text-[#B8860B] font-black text-lg">৳{order.total_amount}</span></p>
+                    <p className="text-[9px] text-[#D4AF37] mt-4 font-bold tracking-[0.2em] uppercase bg-[#111412] inline-block px-3 py-1.5 rounded-sm">{new Date(order.created_at).toLocaleString()}</p>
                   </div>
                 ))}
               </div>
@@ -1193,155 +1263,220 @@ export default function Home() {
       )}
 
       {showAdminDashboard && (
-        <div className="fixed inset-0 z-[280] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-sm max-w-5xl w-full h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-gray-300">
-            <div className="flex justify-between items-center bg-[#F4F4F4] text-black p-6 border-b border-gray-300">
-              <div className="flex items-center gap-4">
-                 <button onClick={() => setShowAdminDashboard(false)} className="flex items-center gap-2 bg-white text-black hover:bg-gray-200 border border-gray-300 px-4 py-2 rounded-sm font-bold uppercase tracking-widest text-xs transition-colors">
+        <div className="fixed inset-0 z-[280] bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-sm max-w-5xl w-full h-[90vh] flex flex-col overflow-hidden shadow-2xl border-2 border-[#D4AF37]">
+            <div className="flex justify-between items-center bg-[#FAF5EB] text-[#111412] p-6 border-b border-[#EADFC8]">
+              <div className="flex items-center gap-5">
+                 <button onClick={() => setShowAdminDashboard(false)} className="flex items-center gap-2 bg-white text-[#111412] hover:bg-[#EADFC8] border border-[#D4AF37] px-5 py-2.5 rounded-sm font-bold uppercase tracking-[0.2em] text-xs transition-colors">
                     <span className="text-lg leading-none -mt-0.5">←</span> Back
                  </button>
-                 <h2 className="text-2xl font-serif font-bold tracking-widest uppercase">Master Admin Panel</h2>
+                 <h2 className="text-xl font-bold tracking-[0.2em] uppercase text-[#B8860B]">Master Admin Panel</h2>
               </div>
-              <button onClick={() => setShowAdminDashboard(false)} className="text-gray-500 hover:text-red-500 text-3xl leading-none transition-colors">✕</button>
+              <button onClick={() => setShowAdminDashboard(false)} className="text-[#111412] hover:text-red-500 text-3xl leading-none transition-colors">✕</button>
             </div>
 
-            <div className="flex border-b border-gray-300 bg-white">
-              <button onClick={() => setAdminTab('settings')} className={`flex-1 py-4 font-bold text-sm uppercase tracking-widest transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#F9F9F9] border-t-2 border-black text-black shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}>⚙️ Store Settings</button>
-              <button onClick={() => setAdminTab('orders')} className={`flex-1 py-4 font-bold text-sm uppercase tracking-widest transition-colors duration-300 ${adminTab === 'orders' ? 'bg-[#F9F9F9] border-t-2 border-black text-black shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}>📦 Orders</button>
-              <button onClick={() => setAdminTab('products')} className={`flex-1 py-4 font-bold text-sm uppercase tracking-widest transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#F9F9F9] border-t-2 border-black text-black shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-black'}`}>🛍️ Product List</button>
+            <div className="flex border-b border-[#EADFC8] bg-white">
+              <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Store Settings</button>
+              <button onClick={() => setAdminTab('orders')} className={`flex-1 py-5 font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'orders' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>📦 Orders</button>
+              <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Product List</button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#FDFDFD] custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white custom-scrollbar">
               {adminTab === 'settings' && (
-                <div className="space-y-8">
-                  <form onSubmit={handleSaveSettings} className="bg-white p-8 border border-gray-200 rounded-sm shadow-sm">
-                    <h3 className="font-serif font-bold text-2xl mb-6 border-b border-gray-200 pb-3 text-black tracking-widest uppercase">Brand Settings</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                      <div><label className="text-[10px] font-bold mb-2 block text-gray-500 uppercase tracking-widest">Brand Name</label><input value={storeSettings.shop_name} onChange={e=>setStoreSettings({...storeSettings, shop_name: e.target.value})} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3.5 rounded-sm text-sm outline-none focus:border-black transition-colors"/></div>
-                      <div><label className="text-[10px] font-bold mb-2 block text-gray-500 uppercase tracking-widest">Phone (Call & WhatsApp)</label><input value={storeSettings.phone} onChange={e=>setStoreSettings({...storeSettings, phone: e.target.value})} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3.5 rounded-sm text-sm outline-none focus:border-black transition-colors"/></div>
+                <div className="space-y-10">
+                  <form onSubmit={handleSaveSettings} className="bg-[#FAF5EB] p-8 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm">
+                    <h3 className="font-bold text-xl mb-8 border-b border-[#D4AF37]/30 pb-4 text-[#111412] tracking-[0.2em] uppercase">Brand Settings</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                      <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
+                         <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">1. Website Font Style</label>
+                         <select value={storeSettings.font_family} onChange={e=>setStoreSettings({...storeSettings, font_family: e.target.value})} className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner cursor-pointer" style={{fontFamily: storeSettings.font_family}}>
+                           {fontOptions.map((font, idx) => (
+                             <option key={idx} value={font.value} style={{fontFamily: font.value}}>{font.name}</option>
+                           ))}
+                         </select>
+                      </div>
+
+                      <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
+                         <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Global Heading Color</label>
+                         <div className="flex items-center gap-4">
+                           <input type="color" value={storeSettings.heading_color} onChange={e=>setStoreSettings({...storeSettings, heading_color: e.target.value})} className="w-12 h-12 rounded-sm cursor-pointer bg-[#FAF5EB] border border-[#EADFC8] p-1 shadow-sm"/>
+                           <span className="text-xs font-bold text-[#111412] uppercase tracking-widest leading-relaxed">Select color for Category Titles & Headings</span>
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                      <div>
+                        <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Brand Name & Color</label>
+                        <div className="flex gap-3">
+                          <input type="color" value={storeSettings.brand_name_color} onChange={e=>setStoreSettings({...storeSettings, brand_name_color: e.target.value})} className="w-14 h-12 flex-shrink-0 rounded-sm cursor-pointer bg-white border border-[#EADFC8] p-1 shadow-sm"/>
+                          <input value={storeSettings.shop_name} onChange={e=>setStoreSettings({...storeSettings, shop_name: e.target.value})} style={{fontFamily: storeSettings.font_family, color: storeSettings.brand_name_color}} className="w-full bg-white border border-[#EADFC8] p-3 text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner"/>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Phone (Call & WhatsApp)</label>
+                        <input value={storeSettings.phone} onChange={e=>setStoreSettings({...storeSettings, phone: e.target.value})} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-3.5 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner"/>
+                      </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                      <div className="bg-[#F9F9F9] p-6 border border-gray-200 rounded-sm shadow-inner">
-                        <label className="text-[10px] font-bold mb-4 block text-black uppercase tracking-widest">Brand Logo (Square)</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                      <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
+                        <label className="text-[10px] font-bold mb-5 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Brand Logo (Round Moon Style)</label>
                         <div className="flex items-center gap-6">
-                          <div className="w-20 h-20 bg-white border border-gray-300 shadow-sm rounded-sm flex items-center justify-center overflow-hidden shrink-0">
-                            {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider text-center">No Logo</span>}
+                          <div className="w-24 h-24 bg-[#111412] border-2 border-[#D4AF37] shadow-[0_0_10px_rgba(212,175,55,0.4)] rounded-full flex items-center justify-center overflow-hidden shrink-0 relative group">
+                            {storeSettings.logo_url ? (
+                              <>
+                                <img src={storeSettings.logo_url} className="w-full h-full object-cover"/>
+                                <button type="button" onClick={() => handleRemoveImage('logo')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button>
+                              </>
+                            ) : <span className="text-[10px] text-[#D4AF37] font-bold uppercase tracking-wider text-center">No Logo</span>}
                           </div>
                           <div className="flex-1">
-                            <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'logo')} className="text-xs text-gray-600 w-full bg-white p-2 border border-gray-300 rounded-sm cursor-pointer"/>
-                            {uploadingType === 'logo' && <span className="text-[11px] text-black block mt-2 font-black tracking-widest uppercase">Uploading...</span>}
+                            <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'logo')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>
+                            {uploadingType === 'logo' && <span className="text-[10px] text-[#B8860B] block mt-3 font-black tracking-[0.2em] uppercase">Uploading...</span>}
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-[#F9F9F9] p-6 border border-gray-200 rounded-sm shadow-inner">
-                        <label className="text-[10px] font-bold mb-4 block text-black uppercase tracking-widest">★ Website Background</label>
+                      <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
+                        <label className="text-[10px] font-bold mb-5 block text-[#111412] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">★ Website Background</label>
                         <div className="flex items-center gap-6">
-                          <div className="w-24 h-20 bg-white border border-gray-300 shadow-sm rounded-sm flex items-center justify-center overflow-hidden shrink-0">
-                            {storeSettings.category_banners?.['WEBSITE_BG'] ? <img src={storeSettings.category_banners['WEBSITE_BG']} className="w-full h-full object-cover"/> : <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider text-center">No BG</span>}
+                          <div className="w-32 h-24 bg-[#FAF5EB] border border-[#D4AF37] shadow-sm rounded-sm flex items-center justify-center overflow-hidden shrink-0 relative group">
+                            {storeSettings.category_banners?.['WEBSITE_BG'] ? (
+                              <>
+                                <img src={storeSettings.category_banners['WEBSITE_BG']} className="w-full h-full object-cover"/>
+                                <button type="button" onClick={() => handleRemoveImage('website_bg')} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 flex items-center justify-center rounded-sm text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button>
+                              </>
+                            ) : <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider text-center">No BG</span>}
                           </div>
-                          <div className="flex-1">
-                            <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'website_bg')} className="text-xs text-gray-600 w-full bg-white p-2 border border-gray-300 rounded-sm cursor-pointer"/>
-                            {uploadingType === 'website_bg' && <span className="text-[11px] text-black block mt-2 font-black tracking-widest uppercase">Uploading...</span>}
+                          <div className="flex-1 flex flex-col gap-3">
+                            <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'website_bg')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>
+                            {uploadingType === 'website_bg' && <span className="text-[10px] text-[#B8860B] block font-black tracking-[0.2em] uppercase">Uploading...</span>}
+                            
+                            <div className="flex items-center gap-4 mt-2 bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={storeSettings.bg_enabled} onChange={e=>setStoreSettings({...storeSettings, bg_enabled: e.target.checked})} className="w-4 h-4 accent-[#D4AF37] cursor-pointer"/>
+                                <span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Show</span>
+                              </label>
+                              <div className="flex items-center gap-2 flex-1">
+                                <span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Opacity: {storeSettings.bg_opacity}%</span>
+                                <input type="range" min="0" max="100" value={storeSettings.bg_opacity} onChange={e=>setStoreSettings({...storeSettings, bg_opacity: Number(e.target.value)})} className="w-full accent-[#D4AF37] cursor-pointer"/>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mb-6 bg-[#F9F9F9] p-6 border border-gray-200 rounded-sm shadow-inner">
-                      <label className="text-[10px] font-bold mb-5 block text-black uppercase tracking-widest border-b border-gray-300 pb-2">Flash Deal Slider Banners (5 Slots)</label>
-                      <div className="space-y-4">
+                    <div className="mb-8 bg-white p-8 border border-[#EADFC8] rounded-sm shadow-sm">
+                      <label className="text-[11px] font-bold mb-6 block text-[#111412] uppercase tracking-[0.2em] border-b border-[#D4AF37]/50 pb-3">Flash Deal Slider Banners (5 Slots)</label>
+                      <div className="space-y-5">
                         {[0, 1, 2, 3, 4].map(idx => (
-                          <div key={idx} className="flex items-center gap-5 border border-gray-300 p-4 bg-white rounded-sm shadow-sm hover:border-gray-400 transition-colors">
-                            <div className="w-28 h-14 bg-gray-100 border border-gray-300 flex items-center justify-center overflow-hidden shrink-0 rounded-sm">
-                              {storeSettings.banners[idx]?.imageUrl ? <img src={storeSettings.banners[idx].imageUrl} className="w-full h-full object-cover"/> : <span className="text-[10px] text-gray-400 font-black tracking-widest">SLIDE {idx+1}</span>}
+                          <div key={idx} className="flex items-center gap-6 border border-[#EADFC8] p-5 bg-[#FAF5EB] rounded-sm shadow-inner hover:border-[#D4AF37] transition-colors">
+                            <div className="w-32 h-16 bg-white border border-[#D4AF37]/50 flex items-center justify-center overflow-hidden shrink-0 rounded-sm relative group shadow-sm">
+                              {storeSettings.banners[idx]?.imageUrl ? (
+                                <>
+                                  <img src={storeSettings.banners[idx].imageUrl} className="w-full h-full object-cover"/>
+                                  <button type="button" onClick={() => handleRemoveImage('banner', idx)} className="absolute top-1 right-1 bg-red-500 text-white w-5 h-5 flex items-center justify-center rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button>
+                                </>
+                              ) : <span className="text-[9px] text-[#B8860B] font-black tracking-[0.2em]">SLIDE {idx+1}</span>}
                             </div>
                             <div className="flex-1">
-                              <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'banner', idx)} className="text-xs w-full text-gray-600 cursor-pointer p-1"/>
+                              <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'banner', idx)} className="text-xs w-full text-[#111412] bg-white p-2.5 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>
                             </div>
                           </div>
                         ))}
                       </div>
-                      <div className="flex items-center gap-3 mt-6 bg-white p-4 border border-gray-300 rounded-sm shadow-sm">
-                         <input type="checkbox" checked={storeSettings.flashDealActive} onChange={e=>setStoreSettings({...storeSettings, flashDealActive: e.target.checked})} className="w-5 h-5 accent-black cursor-pointer"/>
-                         <label className="text-xs font-black text-black tracking-widest uppercase">Enable Countdown Timer</label>
+                      <div className="flex items-center gap-4 mt-8 bg-[#FAF5EB] p-5 border border-[#D4AF37]/50 rounded-sm shadow-sm">
+                         <input type="checkbox" checked={storeSettings.flashDealActive} onChange={e=>setStoreSettings({...storeSettings, flashDealActive: e.target.checked})} className="w-5 h-5 accent-[#D4AF37] cursor-pointer"/>
+                         <label className="text-xs font-black text-[#111412] tracking-[0.2em] uppercase">Enable Countdown Timer</label>
                       </div>
                     </div>
-                    <button type="submit" className="w-full bg-[#222] text-white px-8 py-4 text-sm font-bold rounded-sm shadow-md hover:bg-black transition-colors duration-300 tracking-widest uppercase">Save Brand Settings</button>
+                    <button type="submit" className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-8 py-5 text-[13px] font-bold rounded-sm shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase">Save Brand Settings</button>
                   </form>
 
-                  <div className="bg-white p-8 border border-gray-200 rounded-sm shadow-sm mt-6">
-                    <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-3">
-                       <h3 className="font-serif font-bold text-2xl text-black tracking-widest uppercase">Custom Category Banners</h3>
-                       <button type="button" onClick={() => setCustomSections([...customSections, { id: Date.now().toString(), title: 'New Banner Section', fontSize: 36, imageUrl: '' }])} className="bg-[#222] text-white px-5 py-2.5 text-xs font-bold rounded-sm hover:bg-black transition-colors shadow-md uppercase tracking-wider">+ Add New Banner</button>
+                  <div className="bg-[#FAF5EB] p-8 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm mt-8">
+                    <div className="flex justify-between items-center mb-8 border-b border-[#D4AF37]/30 pb-4">
+                       <h3 className="font-bold text-xl text-[#111412] tracking-[0.2em] uppercase">Custom Category Banners</h3>
+                       <button type="button" onClick={() => setCustomSections([...customSections, { id: Date.now().toString(), title: 'New Banner Section', fontSize: 36, imageUrl: '', color: '#B8860B' }])} className="bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-6 py-3 text-[10px] font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-md uppercase tracking-[0.2em]">+ Add New Banner</button>
                     </div>
                     
-                    <div className="space-y-6">
+                    <div className="space-y-8">
                       {customSections.length === 0 ? (
-                         <p className="text-gray-500 text-sm text-center py-6 border border-dashed border-gray-300">No custom banners added yet.</p>
+                         <p className="text-gray-500 text-xs text-center py-10 border border-dashed border-[#D4AF37]/50 bg-white tracking-[0.2em] uppercase font-bold rounded-sm">No custom banners added yet.</p>
                       ) : customSections.map((section, index) => (
-                        <div key={section.id} className="flex flex-col md:flex-row gap-6 items-start md:items-center p-6 border border-gray-300 rounded-sm bg-[#F9F9F9] shadow-inner relative group">
-                          <button type="button" onClick={() => setCustomSections(customSections.filter(s => s.id !== section.id))} className="absolute top-3 right-3 bg-red-500 text-white w-7 h-7 flex items-center justify-center rounded-sm text-sm hover:bg-red-600 transition-colors shadow-md z-10" title="Delete Banner">✕</button>
+                        <div key={section.id} className="flex flex-col md:flex-row gap-8 items-start md:items-center p-8 border border-[#EADFC8] rounded-sm bg-white shadow-sm relative group">
+                          <button type="button" onClick={() => setCustomSections(customSections.filter(s => s.id !== section.id))} className="absolute top-4 right-4 bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-sm text-sm hover:bg-red-600 transition-colors shadow-md z-10" title="Delete Banner">✕</button>
 
-                          <div className="w-full md:w-1/3 flex flex-col gap-4">
+                          <div className="w-full md:w-1/3 flex flex-col gap-5">
                             <div>
-                               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 block">Banner Title / Category Match</label>
-                               <input type="text" value={section.title} onChange={e => { const newSec = [...customSections]; newSec[index].title = e.target.value; setCustomSections(newSec); }} className="w-full bg-white border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black transition-colors"/>
+                               <label className="text-[10px] font-bold text-[#B8860B] uppercase tracking-[0.2em] mb-2 block">Banner Title & Text Color</label>
+                               <div className="flex gap-3">
+                                 <input type="color" value={section.color || '#B8860B'} onChange={e => { const newSec = [...customSections]; newSec[index].color = e.target.value; setCustomSections(newSec); }} className="w-12 h-11 flex-shrink-0 rounded-sm cursor-pointer bg-[#FAF5EB] border border-[#EADFC8] p-1 shadow-sm"/>
+                                 <input type="text" value={section.title} onChange={e => { const newSec = [...customSections]; newSec[index].title = e.target.value; setCustomSections(newSec); }} style={{fontFamily: storeSettings.font_family, color: section.color || '#B8860B'}} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors"/>
+                               </div>
                             </div>
                             <div>
-                               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 block">Text Size (e.g. 36)</label>
-                               <input type="number" value={section.fontSize} onChange={e => { const newSec = [...customSections]; newSec[index].fontSize = Number(e.target.value); setCustomSections(newSec); }} className="w-full bg-white border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black transition-colors"/>
+                               <label className="text-[10px] font-bold text-[#B8860B] uppercase tracking-[0.2em] mb-2 block">Text Size (e.g. 36)</label>
+                               <input type="number" value={section.fontSize} onChange={e => { const newSec = [...customSections]; newSec[index].fontSize = Number(e.target.value); setCustomSections(newSec); }} className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-3.5 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors"/>
                             </div>
                             <div>
-                               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 block">Upload Banner Image</label>
-                               <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'custom_section', undefined, section.id)} className="text-[10px] text-gray-600 w-full bg-white p-2.5 border border-gray-300 rounded-sm cursor-pointer"/>
-                               {uploadingType === `custom_${section.id}` && <span className="text-[11px] text-black block mt-2 font-black tracking-widest uppercase">Uploading...</span>}
+                               <label className="text-[10px] font-bold text-[#B8860B] uppercase tracking-[0.2em] mb-2 block">Upload Banner Image</label>
+                               <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'custom_section', undefined, section.id)} className="text-[11px] text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>
+                               {uploadingType === `custom_${section.id}` && <span className="text-[10px] text-[#B8860B] block mt-2 font-black tracking-[0.2em] uppercase">Uploading...</span>}
                             </div>
                           </div>
                           
-                          <div className="w-full md:w-2/3 h-40 bg-white border border-gray-300 rounded-sm flex items-center justify-center overflow-hidden shadow-sm">
-                             {section.imageUrl ? <img src={section.imageUrl} className="w-full h-full object-cover"/> : <span className="text-[10px] text-gray-400 font-bold tracking-widest uppercase">No Banner Uploaded</span>}
+                          <div className="w-full md:w-2/3 h-48 bg-[#FAF5EB] border border-[#D4AF37]/50 rounded-sm flex items-center justify-center overflow-hidden shadow-sm">
+                             {section.imageUrl ? <img src={section.imageUrl} className="w-full h-full object-cover"/> : <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">No Banner Uploaded</span>}
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="bg-white p-8 border border-gray-200 rounded-sm shadow-sm mt-6">
-                      <h3 className="font-serif font-bold text-xl mb-6 border-b border-gray-200 pb-3 text-black tracking-widest uppercase">Website Pages Content</h3>
-                      <div className="space-y-5">
+                  <div className="bg-[#FAF5EB] p-8 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm mt-8">
+                      <div className="flex items-center gap-4 mb-8 border-b border-[#D4AF37]/30 pb-4">
+                        <h3 className="font-bold text-xl text-[#111412] tracking-[0.2em] uppercase">Website Pages Content</h3>
+                        <div className="ml-auto flex items-center gap-3">
+                           <label className="text-[10px] font-bold text-[#B8860B] uppercase tracking-[0.2em]">Text Color</label>
+                           <input type="color" value={storeSettings.page_text_color} onChange={e=>setStoreSettings({...storeSettings, page_text_color: e.target.value})} className="w-10 h-10 rounded-sm cursor-pointer bg-white border border-[#EADFC8] p-1 shadow-sm"/>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-6">
                          <div>
-                            <label className="text-[10px] font-bold mb-2 block text-gray-500 uppercase tracking-widest">Contact Info (যোগাযোগ)</label>
-                            <textarea rows={3} value={storeSettings.contact_info} onChange={e=>setStoreSettings({...storeSettings, contact_info: e.target.value})} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black transition-colors"></textarea>
+                            <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Contact Info (যোগাযোগ)</label>
+                            <textarea rows={3} value={storeSettings.contact_info} onChange={e=>setStoreSettings({...storeSettings, contact_info: e.target.value})} style={{color: storeSettings.page_text_color}} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner"></textarea>
                          </div>
                          <div>
-                            <label className="text-[10px] font-bold mb-2 block text-gray-500 uppercase tracking-widest">Return Policy (রিটার্ন পলিসি)</label>
-                            <textarea rows={3} value={storeSettings.return_policy} onChange={e=>setStoreSettings({...storeSettings, return_policy: e.target.value})} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black transition-colors"></textarea>
+                            <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Return Policy (রিটার্ন পলিসি)</label>
+                            <textarea rows={3} value={storeSettings.return_policy} onChange={e=>setStoreSettings({...storeSettings, return_policy: e.target.value})} style={{color: storeSettings.page_text_color}} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner"></textarea>
                          </div>
                          <div>
-                            <label className="text-[10px] font-bold mb-2 block text-gray-500 uppercase tracking-widest">Delivery Policy (ডেলিভারি পলিসি)</label>
-                            <textarea rows={3} value={storeSettings.delivery_policy} onChange={e=>setStoreSettings({...storeSettings, delivery_policy: e.target.value})} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black transition-colors"></textarea>
+                            <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Delivery Policy (ডেলিভারি পলিসি)</label>
+                            <textarea rows={3} value={storeSettings.delivery_policy} onChange={e=>setStoreSettings({...storeSettings, delivery_policy: e.target.value})} style={{color: storeSettings.page_text_color}} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner"></textarea>
                          </div>
                       </div>
-                      <button onClick={handleSaveSettings} className="w-full mt-5 bg-[#222] text-white px-8 py-4 text-sm font-bold rounded-sm shadow-md hover:bg-black transition-colors duration-300 tracking-widest uppercase">Save Pages Content</button>
+                      <button onClick={handleSaveSettings} className="w-full mt-8 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-8 py-5 text-[13px] font-bold rounded-sm shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase">Save Pages Content</button>
                   </div>
                 </div>
               )}
 
               {adminTab === 'orders' && (
                 <div className="space-y-6">
-                  {orders.length === 0 ? <p className="text-center py-12 text-gray-500 font-bold border-2 border-dashed border-gray-300 rounded-sm bg-white tracking-widest uppercase text-sm">No orders found.</p> : orders.map(order => (
-                    <div key={order.id} className="bg-white p-6 md:p-8 border border-gray-200 rounded-sm shadow-sm hover:border-gray-300 transition-colors">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 pb-4 mb-5 gap-4">
+                  {orders.length === 0 ? <p className="text-center py-16 text-gray-500 font-bold border-2 border-dashed border-[#D4AF37]/50 rounded-sm bg-[#FAF5EB] tracking-[0.2em] uppercase text-xs">No orders found.</p> : orders.map(order => (
+                    <div key={order.id} className="bg-[#FAF5EB] p-6 md:p-8 border border-[#EADFC8] rounded-sm shadow-sm hover:border-[#D4AF37] transition-colors">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-[#D4AF37]/30 pb-5 mb-6 gap-5">
                         <div>
-                           <p className="font-black text-lg text-black uppercase tracking-wider">Order #{order.id.split('-')[0]}</p>
-                           <div className="flex items-center gap-3 mt-2">
-                             <p className="text-[10px] text-gray-500 font-bold tracking-widest uppercase bg-[#F9F9F9] px-2 py-1 rounded-sm border border-gray-200">{new Date(order.created_at).toLocaleString()}</p>
-                             <p className={`text-[10px] font-black px-2.5 py-1 rounded-sm uppercase tracking-wider border ${getStatusColor(order.status)}`}>{order.payment_method}</p>
+                           <p className="font-black text-lg text-[#111412] uppercase tracking-wider">Order #{order.id.split('-')[0]}</p>
+                           <div className="flex items-center gap-4 mt-3">
+                             <p className="text-[10px] text-gray-500 font-bold tracking-[0.2em] uppercase bg-white px-3 py-1.5 rounded-sm border border-[#EADFC8]">{new Date(order.created_at).toLocaleString()}</p>
+                             <p className={`text-[10px] font-black px-3 py-1.5 rounded-sm uppercase tracking-wider border ${getStatusColor(order.status)}`}>{order.payment_method}</p>
                            </div>
                         </div>
-                        <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} className={`text-xs font-bold p-2.5 rounded-sm outline-none cursor-pointer shadow-sm uppercase tracking-wider border ${getStatusColor(order.status)}`}>
+                        <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} className={`text-xs font-bold p-3 rounded-sm outline-none cursor-pointer shadow-sm uppercase tracking-[0.1em] border ${getStatusColor(order.status)}`}>
                           <option value="PENDING" className="bg-white text-black">PENDING</option>
                           <option value="CONFIRMED" className="bg-white text-black">CONFIRMED</option>
                           <option value="PROCESSING" className="bg-white text-black">PROCESSING</option>
@@ -1350,16 +1485,16 @@ export default function Home() {
                           <option value="CANCELLED" className="bg-white text-black">CANCELLED</option>
                         </select>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                        <div className="bg-[#F9F9F9] p-5 rounded-sm border border-gray-200 shadow-inner">
-                          <p className="text-[10px] text-gray-500 mb-2 font-black uppercase tracking-widest border-b border-gray-200 pb-1">Customer Details</p>
-                          <p className="font-bold text-black text-lg mb-1">{order.customer_name}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+                        <div className="bg-white p-6 rounded-sm border border-[#EADFC8] shadow-sm">
+                          <p className="text-[10px] text-[#B8860B] mb-3 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Customer Details</p>
+                          <p className="font-bold text-[#111412] text-lg mb-1">{order.customer_name}</p>
                           <p className="font-medium text-gray-600">{order.customer_phone}</p>
                         </div>
-                        <div className="bg-[#F9F9F9] p-5 rounded-sm border border-gray-200 shadow-inner">
-                          <p className="text-[10px] text-gray-500 mb-2 font-black uppercase tracking-widest border-b border-gray-200 pb-1">Shipping Info</p>
-                          <p className="line-clamp-2 font-medium text-gray-600 mb-3">{order.customer_address}</p>
-                          <p className="font-black text-black text-xl border-t border-gray-200 pt-2">Total: <span className="text-black">৳{order.total_amount}</span></p>
+                        <div className="bg-white p-6 rounded-sm border border-[#EADFC8] shadow-sm">
+                          <p className="text-[10px] text-[#B8860B] mb-3 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Shipping Info</p>
+                          <p className="line-clamp-2 font-medium text-gray-600 mb-4">{order.customer_address}</p>
+                          <p className="font-black text-[#111412] text-xl border-t border-[#EADFC8] pt-3">Total: <span className="text-[#B8860B]">৳{order.total_amount}</span></p>
                         </div>
                       </div>
                     </div>
@@ -1378,42 +1513,62 @@ export default function Home() {
       )}
       
       {showProductModal && (
-        <div className="fixed inset-0 z-[280] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-300 max-w-2xl w-full p-8 relative shadow-2xl rounded-sm max-h-[95vh] overflow-y-auto custom-scrollbar">
-            <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
-               <button onClick={() => setShowProductModal(false)} className="flex items-center gap-2 text-black font-bold uppercase tracking-widest text-sm transition-colors bg-white hover:bg-gray-100 border border-gray-300 px-5 py-2.5 rounded-sm">
+        <div className="fixed inset-0 z-[300] bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#FAF5EB] border-2 border-[#D4AF37] max-w-2xl w-full p-8 md:p-10 relative shadow-2xl rounded-sm max-h-[95vh] overflow-y-auto custom-scrollbar">
+            <div className="flex justify-between items-center mb-8 border-b border-[#EADFC8] pb-5">
+               <button onClick={() => setShowProductModal(false)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white hover:bg-[#EADFC8] border border-[#D4AF37] px-5 py-2.5 rounded-sm">
                   <span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান
                </button>
-               <h3 className="text-2xl font-serif font-bold text-black uppercase tracking-widest">{editingProductId ? "Update Product" : "Add Product"}</h3>
-               <button onClick={() => setShowProductModal(false)} className="text-gray-400 hover:text-red-500 text-3xl font-light transition-colors">✕</button>
+               <h3 className="text-xl font-bold text-[#B8860B] uppercase tracking-[0.2em]">{editingProductId ? "Update Product" : "Add Product"}</h3>
+               <button onClick={() => setShowProductModal(false)} className="text-[#111412] hover:text-red-500 text-3xl font-light transition-colors">✕</button>
             </div>
             
-            <form onSubmit={handleSaveProduct} className="space-y-5">
-              <div><label className="block text-xs font-bold mb-2 text-gray-600 uppercase tracking-wider">Product Name</label><input required value={newName} onChange={e => setNewName(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black shadow-inner transition-colors"/></div>
-              <div className="flex gap-5">
-                <div className="flex-1"><label className="block text-xs font-bold mb-2 text-gray-600 uppercase tracking-wider">Sale Price</label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black shadow-inner transition-colors"/></div>
-                <div className="flex-1"><label className="block text-xs font-bold mb-2 text-gray-600 uppercase tracking-wider">Original Price</label><input value={newOriginalPrice} onChange={e => setNewOriginalPrice(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black shadow-inner transition-colors"/></div>
+            <form onSubmit={handleSaveProduct} className="space-y-6">
+              <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Product Name</label><input required value={newName} onChange={e => setNewName(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
+              <div className="flex gap-6">
+                <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Regular Price (কাটা দাগ থাকবে)</label><input value={newOriginalPrice} onChange={e => setNewOriginalPrice(e.target.value)} placeholder="e.g. 1500" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
+                <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Offer Price (বর্তমান দাম)</label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
               </div>
-              <div className="bg-[#F9F9F9] border border-gray-200 p-5 rounded-sm shadow-sm">
-                <span className="text-xs font-bold block mb-4 text-black uppercase tracking-widest border-b border-gray-300 pb-2">Product Images (Max 4)</span>
-                <div className="grid grid-cols-2 gap-4">
-                  <input type="file" onChange={e => handleImageUpload(e, 'product1')} className="text-[10px] bg-white text-gray-600 p-2 border border-gray-300 rounded-sm w-full cursor-pointer"/>
-                  <input type="file" onChange={e => handleImageUpload(e, 'product2')} className="text-[10px] bg-white text-gray-600 p-2 border border-gray-300 rounded-sm w-full cursor-pointer"/>
-                  <input type="file" onChange={e => handleImageUpload(e, 'product3')} className="text-[10px] bg-white text-gray-600 p-2 border border-gray-300 rounded-sm w-full cursor-pointer"/>
-                  <input type="file" onChange={e => handleImageUpload(e, 'product4')} className="text-[10px] bg-white text-gray-600 p-2 border border-gray-300 rounded-sm w-full cursor-pointer"/>
+              <div className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm">
+                <span className="text-[10px] font-bold block mb-5 text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Product Images (Max 4)</span>
+                <div className="grid grid-cols-2 gap-5">
+                  {[ 
+                    {url: newImageUrl, set: setNewImageUrl, id: 'product1'}, 
+                    {url: newImageUrl2, set: setNewImageUrl2, id: 'product2'}, 
+                    {url: newImageUrl3, set: setNewImageUrl3, id: 'product3'}, 
+                    {url: newImageUrl4, set: setNewImageUrl4, id: 'product4'} 
+                  ].map((imgItem, idx) => (
+                    <div key={idx} className="relative">
+                      {imgItem.url ? (
+                        <div className="w-full h-24 border border-[#D4AF37] rounded-sm overflow-hidden relative group shadow-sm bg-[#FAF5EB]">
+                          <img src={imgItem.url} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => imgItem.set('')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button>
+                        </div>
+                      ) : (
+                        <input type="file" accept="image/*" onChange={e => handleImageUpload(e, imgItem.id)} className="text-[11px] bg-[#FAF5EB] text-[#111412] p-3 border border-[#EADFC8] outline-none focus:border-[#D4AF37] rounded-sm w-full cursor-pointer h-24"/>
+                      )}
+                      {uploadingType === imgItem.id && <span className="text-[10px] text-[#B8860B] absolute bottom-1 left-2 font-black tracking-widest bg-white/80 px-1 rounded">Uploading...</span>}
+                    </div>
+                  ))}
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold mb-2 text-gray-600 uppercase tracking-wider">Category (Select or Type New)</label>
-                <input list="category-options" required placeholder="Select existing or type custom" value={newCategory} onChange={e => setNewCategory(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3 rounded-sm text-sm outline-none focus:border-black shadow-inner transition-colors"/>
+                <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Category (Select or Type New)</label>
+                <input list="category-options" required placeholder="Select existing or type custom" value={newCategory} onChange={e => setNewCategory(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
                 <datalist id="category-options">
                   {dynamicSidebarCategories.map((cat, index) => <option key={index} value={cat} />)}
                 </datalist>
-                <p className="text-[10px] text-gray-500 mt-2 font-bold tracking-widest uppercase">Select from list to group correctly, or type new.</p>
+                <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-[0.2em] uppercase">Select from list to group correctly, or type new.</p>
               </div>
-              <div><label className="block text-xs font-bold mb-2 text-gray-600 uppercase tracking-wider">Description</label><textarea rows={3} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-[#F9F9F9] border border-gray-300 text-black p-3 rounded-sm text-sm custom-scrollbar outline-none focus:border-black shadow-inner transition-colors"></textarea></div>
-              <div className="flex items-center gap-3 bg-[#F9F9F9] p-3 border border-gray-300 rounded-sm shadow-sm"><input type="checkbox" checked={newInStock} onChange={e => setNewInStock(e.target.checked)} className="w-5 h-5 accent-black cursor-pointer"/><label className="text-sm font-bold text-black uppercase tracking-wider">In Stock</label></div>
-              <button type="submit" disabled={isSaving || !!uploadingType} className="w-full bg-[#222] text-white font-bold py-4 text-sm rounded-sm mt-4 uppercase tracking-widest hover:bg-black transition-colors duration-300 shadow-md border border-transparent">{isSaving ? "Saving..." : "Save Product"}</button>
+              <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description</label><textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea></div>
+              <div className="flex items-center gap-4 bg-white p-4 border border-[#EADFC8] rounded-sm shadow-sm"><input type="checkbox" checked={newInStock} onChange={e => setNewInStock(e.target.checked)} className="w-5 h-5 accent-[#D4AF37] cursor-pointer"/><label className="text-[11px] font-bold text-[#111412] uppercase tracking-[0.2em]">In Stock</label></div>
+              
+              <div className="flex gap-4 mt-6">
+                {editingProductId && (
+                   <button type="button" onClick={(e) => { setShowProductModal(false); handleDeleteProduct(editingProductId, e); }} className="w-1/3 bg-red-600 text-white font-bold py-5 text-[11px] rounded-sm uppercase tracking-[0.2em] hover:bg-red-700 transition-colors shadow-md">Delete</button>
+                )}
+                <button type="submit" disabled={isSaving || !!uploadingType} className="flex-1 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-5 text-[13px] rounded-sm uppercase tracking-[0.2em] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 shadow-md">{isSaving ? "Saving..." : "Save Product"}</button>
+              </div>
             </form>
           </div>
         </div>
