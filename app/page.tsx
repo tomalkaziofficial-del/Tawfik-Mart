@@ -72,6 +72,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [activeSubCategories, setActiveSubCategories] = useState<Record<string, string>>({});
 
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
@@ -115,14 +116,10 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [userOrders, setUserOrders] = useState<Order[]>([]);
-  const [authView, setAuthView] = useState<'OTP' | 'PASSWORD' | 'REGISTER'>('OTP');
+  
+  const [authView, setAuthView] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
-  const [authPhone, setAuthPhone] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [authOtpCode, setAuthOtpCode] = useState('');
-  const [captcha, setCaptcha] = useState({ num1: 0, num2: 0 });
-  const [userCaptcha, setUserCaptcha] = useState('');
   const [authLoading, setAuthLoading] = useState(false); 
 
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
@@ -140,9 +137,9 @@ export default function Home() {
   const [newImageUrl4, setNewImageUrl4] = useState('');
   const [newDescription, setNewDescription] = useState(''); 
   const [newCategory, setNewCategory] = useState('');
+  const [newSubCategory, setNewSubCategory] = useState(''); 
   const [newBrand, setNewBrand] = useState(''); 
   const [newColor, setNewColor] = useState(''); 
-  const [newTag, setNewTag] = useState(''); 
   const [newInStock, setNewInStock] = useState(true);
   
   const [isSaving, setIsSaving] = useState(false);
@@ -175,16 +172,9 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
-  const generateCaptcha = () => {
-    setCaptcha({ num1: Math.floor(Math.random() * 10) + 1, num2: Math.floor(Math.random() * 10) + 1 });
-    setUserCaptcha('');
-  };
-
   useEffect(() => {
     if (showAuthModal) {
-      generateCaptcha();
-      setAuthView('OTP');
-      setOtpSent(false);
+      setAuthView('LOGIN');
     }
   }, [showAuthModal]);
 
@@ -407,7 +397,7 @@ export default function Home() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault(); setAuthLoading(true);
     try {
-      if (authView === 'PASSWORD') { 
+      if (authView === 'LOGIN') { 
          const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword }); 
          if (error) throw error; alert("স্বাগতম!"); setShowAuthModal(false); 
       } else { 
@@ -417,24 +407,16 @@ export default function Home() {
     } catch (error: any) { alert(error.message); } finally { setAuthLoading(false); }
   };
 
-  const handleSendOTP = async (e: React.FormEvent) => {
-     e.preventDefault();
-     if (parseInt(userCaptcha) !== captcha.num1 + captcha.num2) { alert("ক্যাপচা (যোগফল) ভুল হয়েছে!"); generateCaptcha(); return; }
-     setAuthLoading(true);
-     try {
-         const phoneForOtp = authPhone.startsWith('+88') ? authPhone : '+88' + authPhone;
-         const { error } = await supabase.auth.signInWithOtp({ phone: phoneForOtp });
-         if (error) throw error; setOtpSent(true); alert("OTP পাঠানো হয়েছে!");
-     } catch(error: any) { alert("SMS Provider Setup Error: " + error.message); } finally { setAuthLoading(false); }
-  };
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-      e.preventDefault(); setAuthLoading(true);
-      try {
-          const phoneForOtp = authPhone.startsWith('+88') ? authPhone : '+88' + authPhone;
-          const { error } = await supabase.auth.verifyOtp({ phone: phoneForOtp, token: authOtpCode, type: 'sms' });
-          if (error) throw error; alert("লগইন সফল!"); setShowAuthModal(false);
-      } catch(error: any) { alert(error.message); } finally { setAuthLoading(false); }
+  const handleGoogleLogin = async () => {
+    setAuthLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      if (error) throw error;
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleLogout = async () => { const { error } = await supabase.auth.signOut(); if (!error) { alert("লগআউট সফল।"); setShowProfileModal(false); window.location.reload(); } };
@@ -561,13 +543,13 @@ export default function Home() {
 
   const openAddModal = () => { 
     setEditingProductId(null); setNewName(''); setNewPrice(''); setNewOriginalPrice(''); setNewImageUrl(''); setNewImageUrl2(''); setNewImageUrl3(''); setNewImageUrl4('');
-    setNewDescription(''); setNewCategory(''); setNewBrand(''); setNewColor(''); setNewTag(''); setNewInStock(true); setShowProductModal(true); setShowAdminDashboard(false); 
+    setNewDescription(''); setNewCategory(''); setNewSubCategory(''); setNewBrand(''); setNewColor(''); setNewInStock(true); setShowProductModal(true); setShowAdminDashboard(false); 
   };
   
   const openEditModal = (product: Product, e: React.MouseEvent) => { 
-    e.stopPropagation(); setEditingProductId(product.id); setNewName(product.name); setNewPrice(product.price); setNewOriginalPrice(product.original_price || ''); 
+    e.stopPropagation(); setEditingProductId(product.id); setNewName(product.name || ''); setNewPrice(product.price || ''); setNewOriginalPrice(product.original_price || ''); 
     setNewImageUrl(product.image_url || ''); setNewImageUrl2(product.image_url_2 || ''); setNewImageUrl3(product.image_url_3 || ''); setNewImageUrl4(product.image_url_4 || '');
-    setNewDescription(product.description || ''); setNewCategory(product.category); setNewBrand(product.brand || ''); setNewColor(product.color || ''); setNewTag(product.tag || ''); setNewInStock(product.in_stock !== false); setShowProductModal(true); setShowAdminDashboard(false);
+    setNewDescription(product.description || ''); setNewCategory(product.category); setNewSubCategory(product.tag || ''); setNewBrand(product.brand || ''); setNewColor(product.color || ''); setNewInStock(product.in_stock !== false); setShowProductModal(true); setShowAdminDashboard(false);
   };
   
   const handleDeleteProduct = async (id: string, e?: React.MouseEvent) => { 
@@ -580,22 +562,29 @@ export default function Home() {
     e.preventDefault(); setIsSaving(true);
     try {
       const productData = { 
-        name: newName, price: newPrice, original_price: newOriginalPrice || null, 
+        name: newName || '', price: newPrice, original_price: newOriginalPrice || null, 
         image_url: newImageUrl || null, image_url_2: newImageUrl2 || null, image_url_3: newImageUrl3 || null, image_url_4: newImageUrl4 || null, 
-        description: newDescription || null, category: newCategory || "New Category", in_stock: newInStock, tag: newTag, brand: newBrand || null, color: newColor || null
+        description: newDescription || null, category: newCategory || "New Category", in_stock: newInStock, tag: newSubCategory, brand: newBrand || null, color: newColor || null
       };
       if (editingProductId) await supabase.from('products').update(productData).eq('id', editingProductId); else await supabase.from('products').insert([productData]);
       setShowProductModal(false); fetchProducts(); alert("সফলভাবে সেভ হয়েছে!");
     } catch (error: any) { alert("Error saving product: " + error.message); } finally { setIsSaving(false); }
   };
 
+  const handleSubCategoryClick = (catName: string, subName: string) => {
+    setActiveSubCategories(prev => ({ ...prev, [catName]: subName }));
+  };
+
   // সম্পূর্ণ ডাইনামিক ক্যাটাগরি তৈরি 
+  const specialCategories = ["⚡ ফ্লাশ সেল", "নতুন কালেকশন", "এক্সক্লুসিভ", "সকল ব্র্যান্ড"];
   const dynamicSidebarCategories = Array.from(new Set([
     ...customSections.map(c => c.title), 
     ...products.map(p => p.category).filter(Boolean)
   ]));
+  
+  const allCategoryOptions = Array.from(new Set([...specialCategories, ...dynamicSidebarCategories]));
 
-  const filteredProducts = products.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredProducts = products.filter(item => (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
   const bgImage = storeSettings.category_banners?.['WEBSITE_BG'];
   const isBgVisible = storeSettings.bg_enabled && bgImage;
   const renderedCategories = new Set<string>();
@@ -633,8 +622,8 @@ export default function Home() {
         </div>
         
         <div className="p-4 flex flex-col items-center text-center flex-grow bg-white">
-          <p className="text-[9px] text-[#D4AF37] font-bold uppercase tracking-[0.2em] mb-1.5">{item.category}</p>
-          <h4 className="text-[13px] text-[#111412] font-bold mb-2 line-clamp-1">{item.name}</h4>
+          <p className="text-[9px] text-[#D4AF37] font-bold uppercase tracking-[0.2em] mb-1.5">{item.tag || item.category}</p>
+          {item.name && item.name !== '' && <h4 className="text-[13px] text-[#111412] font-bold mb-2 line-clamp-1">{item.name}</h4>}
           
           <div className="flex flex-col items-center justify-center mb-4 mt-auto w-full leading-tight">
             {item.original_price && <span className="text-[12px] text-gray-400 line-through mb-0.5">৳ {formatPrice(item.original_price)}</span>}
@@ -719,11 +708,11 @@ export default function Home() {
         </header>
 
         <div className="hidden md:flex justify-center items-center gap-8 py-3.5 bg-white border-b border-[#EADFC8] text-[11px] font-bold text-[#111412] uppercase tracking-[0.15em]">
-           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors" onClick={() => setActiveCategory('All')}>সকল ক্যাটাগরি</span>
-           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors text-gray-500">⚡ ফ্লাশ সেল</span>
-           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors text-gray-500">নতুন কালেকশন</span>
-           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors text-gray-500">এক্সক্লুসিভ</span>
-           <span className="cursor-pointer hover:text-[#D4AF37] transition-colors text-gray-500">সকল ব্র্যান্ড</span>
+           <span className={`cursor-pointer transition-colors ${activeCategory === 'All' ? 'text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}}>সকল ক্যাটাগরি</span>
+           <span className={`cursor-pointer transition-colors ${activeCategory === '⚡ ফ্লাশ সেল' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('⚡ ফ্লাশ সেল'); window.scrollTo(0,0);}}>⚡ ফ্লাশ সেল</span>
+           <span className={`cursor-pointer transition-colors ${activeCategory === 'নতুন কালেকশন' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('নতুন কালেকশন'); window.scrollTo(0,0);}}>নতুন কালেকশন</span>
+           <span className={`cursor-pointer transition-colors ${activeCategory === 'এক্সক্লুসিভ' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('এক্সক্লুসিভ'); window.scrollTo(0,0);}}>এক্সক্লুসিভ</span>
+           <span className={`cursor-pointer transition-colors ${activeCategory === 'সকল ব্র্যান্ড' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('সকল ব্র্যান্ড'); window.scrollTo(0,0);}}>সকল ব্র্যান্ড</span>
         </div>
 
         <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-12">
@@ -761,12 +750,25 @@ export default function Home() {
                     const catProducts = filteredProducts.filter(item => item.category === section.title);
                     if (catProducts.length === 0 && !section.imageUrl) return null;
 
+                    const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
+                    const currentSub = activeSubCategories[section.title] || 'All';
+                    const finalProducts = currentSub === 'All' ? catProducts : catProducts.filter(item => item.tag === currentSub);
+
                     return (
                       <div key={section.id} className="w-full">
-                        <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
+                        <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-8">
                            <h2 className="font-bold tracking-wide" style={{ fontSize: `${section.fontSize || 32}px`, color: section.color || storeSettings.heading_color || '#B8860B' }}>{section.title}</h2>
-                           <button onClick={() => {setActiveCategory(section.title); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md">সবগুলো দেখুন →</button>
+                           <button onClick={() => {setActiveCategory(section.title); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
                         </div>
+
+                        {subCats.length > 0 && (
+                            <div className="flex gap-3 overflow-x-auto custom-scrollbar mb-8 pb-2">
+                                <button onClick={() => handleSubCategoryClick(section.title, 'All')} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === 'All' ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>সব</button>
+                                {subCats.map(sub => (
+                                    <button key={sub} onClick={() => handleSubCategoryClick(section.title, sub)} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === sub ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>{sub}</button>
+                                ))}
+                            </div>
+                        )}
                         
                         {section.imageUrl && activeCategory === 'All' && (
                           <div className="w-full mb-10 shadow-md rounded-sm overflow-hidden border border-[#EADFC8] relative" style={{ height: 'clamp(150px, 25vw, 300px)' }}>
@@ -774,11 +776,9 @@ export default function Home() {
                           </div>
                         )}
 
-                        {catProducts.length > 0 && (
-                           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
-                             {catProducts.map(item => renderProductCard(item))}
-                           </div>
-                        )}
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
+                            {finalProducts.length > 0 ? finalProducts.map(item => renderProductCard(item)) : <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found in this sub-category</p>}
+                        </div>
                       </div>
                     );
                  })}
@@ -789,15 +789,28 @@ export default function Home() {
                     const catProducts = filteredProducts.filter(item => item.category === catTitle);
                     if (catProducts.length === 0) return null;
 
+                    const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
+                    const currentSub = activeSubCategories[catTitle] || 'All';
+                    const finalProducts = currentSub === 'All' ? catProducts : catProducts.filter(item => item.tag === currentSub);
+
                     return (
                       <div key={catTitle} className="w-full">
-                        <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
+                        <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-8">
                            <h2 className="text-2xl md:text-3xl font-bold tracking-wide" style={{ color: storeSettings.heading_color || '#B8860B' }}>{catTitle}</h2>
-                           <button onClick={() => {setActiveCategory(catTitle); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md">সবগুলো দেখুন →</button>
+                           <button onClick={() => {setActiveCategory(catTitle); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
                         </div>
+
+                        {subCats.length > 0 && (
+                            <div className="flex gap-3 overflow-x-auto custom-scrollbar mb-8 pb-2">
+                                <button onClick={() => handleSubCategoryClick(catTitle, 'All')} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === 'All' ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>সব</button>
+                                {subCats.map(sub => (
+                                    <button key={sub} onClick={() => handleSubCategoryClick(catTitle, sub)} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === sub ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>{sub}</button>
+                                ))}
+                            </div>
+                        )}
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
-                          {catProducts.map(item => renderProductCard(item))}
+                          {finalProducts.length > 0 ? finalProducts.map(item => renderProductCard(item)) : <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found in this sub-category</p>}
                         </div>
                       </div>
                     );
@@ -835,7 +848,7 @@ export default function Home() {
           <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span> Premium Admin
         </div>
         <div className="flex gap-3">
-           <button onClick={() => { setEditingProductId(null); setNewName(''); setNewPrice(''); setNewOriginalPrice(''); setNewImageUrl(''); setNewImageUrl2(''); setNewImageUrl3(''); setNewImageUrl4(''); setNewDescription(''); setNewCategory(''); setNewBrand(''); setNewColor(''); setNewTag(''); setNewInStock(true); setShowProductModal(true); setShowAdminDashboard(false); }} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">+ Add</button>
+           <button onClick={() => { setEditingProductId(null); setNewName(''); setNewPrice(''); setNewOriginalPrice(''); setNewImageUrl(''); setNewImageUrl2(''); setNewImageUrl3(''); setNewImageUrl4(''); setNewDescription(''); setNewCategory(''); setNewSubCategory(''); setNewBrand(''); setNewColor(''); setNewInStock(true); setShowProductModal(true); setShowAdminDashboard(false); }} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">+ Add</button>
            <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.2em] uppercase">⚙️ Settings</button>
         </div>
       </div>
@@ -871,11 +884,14 @@ export default function Home() {
             
             <div className="flex-1 overflow-y-auto custom-scrollbar py-6 text-[12px] font-bold text-[#111412] uppercase tracking-widest">
                <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('All'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> হোম</div>
-               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => setIsSidebarOpen(false)}><span>✦</span> ফ্লাশ সেল</div>
+               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('⚡ ফ্লাশ সেল'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> ফ্লাশ সেল</div>
+               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('নতুন কালেকশন'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> নতুন কালেকশন</div>
+               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('এক্সক্লুসিভ'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> এক্সক্লুসিভ</div>
+               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('সকল ব্র্যান্ড'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> সকল ব্র্যান্ড</div>
                
                <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
                <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black flex items-center gap-2 mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>ক্যাটাগরি সমূহ</div>
-               {dynamicSidebarCategories.map((cat, i) => (
+               {dynamicSidebarCategories.filter(cat => !specialCategories.includes(cat)).map((cat, i) => (
                  <div key={i} className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#111412]" onClick={() => {setActiveCategory(cat); setIsSidebarOpen(false); window.scrollTo(0,0);}}>
                    <span className="text-[10px] text-[#D4AF37]">▶</span> {cat}
                  </div>
@@ -898,99 +914,7 @@ export default function Home() {
         </>
       )}
 
-      {viewingProduct && (
-        <div className="fixed inset-0 z-[280] bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden">
-            <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-4 md:px-8 md:py-5 shadow-sm sticky top-0 z-20">
-               <button onClick={() => setViewingProduct(null)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white px-5 py-2.5 rounded-sm shadow-sm">
-                  <span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান
-               </button>
-               <button onClick={() => setViewingProduct(null)} className="text-[#111412] hover:text-red-600 text-3xl font-light transition-colors">✕</button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-white">
-              <div className="flex flex-col md:flex-row gap-12">
-                <div className="w-full md:w-1/2 flex flex-col gap-5">
-                  <div className="w-full bg-[#FAF5EB] rounded-sm border border-[#EADFC8] flex items-center justify-center p-2 overflow-hidden shadow-sm relative" style={{ height: 'clamp(300px, 40vh, 500px)' }}>
-                     {activeImage ? <img src={activeImage} className="w-full h-full object-contain md:object-cover absolute inset-0 p-2" /> : <span className="text-gray-400 font-medium">No Image</span>}
-                  </div>
-                  {(() => {
-                    const gallery = [viewingProduct.image_url, viewingProduct.image_url_2, viewingProduct.image_url_3, viewingProduct.image_url_4].filter(Boolean) as string[];
-                    if (gallery.length > 1) {
-                      return (
-                        <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-3">
-                          {gallery.map((img, idx) => (
-                            <div key={idx} onClick={() => setActiveImage(img)} className={`w-24 h-24 rounded-sm cursor-pointer border-2 transition-all duration-300 ${activeImage === img ? 'border-[#D4AF37] shadow-md' : 'border-[#EADFC8] hover:border-[#D4AF37]/50'} bg-[#FAF5EB] flex-shrink-0 p-1`}>
-                              <img src={img} className="w-full h-full object-cover rounded-sm" />
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    } return null;
-                  })()}
-                </div>
-                
-                <div className="w-full md:w-1/2 flex flex-col">
-                  <div className="border-b border-[#EADFC8] pb-6 mb-8">
-                    <p className="font-bold text-[10px] uppercase tracking-[0.2em] mb-4" style={{ color: storeSettings.heading_color || '#B8860B' }}>{viewingProduct.category}</p>
-                    <h3 className="text-3xl md:text-4xl font-bold text-[#111412] mb-5 leading-tight">{viewingProduct.name}</h3>
-                    <div className="flex items-center gap-6">
-                      <span className="text-[#B8860B] text-4xl font-black tracking-tight">{formatPrice(viewingProduct.price)} ৳</span>
-                      {viewingProduct.original_price && <span className="text-gray-400 line-through text-xl font-medium">{formatPrice(viewingProduct.original_price)} ৳</span>}
-                    </div>
-                  </div>
-                  
-                  <div className="mb-10 space-y-4">
-                     <button onClick={() => handleDirectOrder(viewingProduct, 1)} disabled={!viewingProduct.in_stock} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-4.5 rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 text-sm shadow-md flex justify-center items-center gap-2 uppercase tracking-[0.2em]">
-                       ⚡ অর্ডার করুন
-                     </button>
-                     <button onClick={() => {addToCart(viewingProduct, 1); setIsCartOpen(true)}} disabled={!viewingProduct.in_stock} className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] font-bold py-4 rounded-sm hover:bg-[#EADFC8] transition-colors duration-300 text-sm flex justify-center items-center gap-2 uppercase tracking-[0.2em] shadow-sm">
-                       🛒 ব্যাগে যোগ
-                     </button>
-                  </div>
-                  
-                  <div className="mt-2 text-gray-700">
-                    <h4 className="text-xs font-bold mb-4 uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2 inline-block" style={{ color: storeSettings.heading_color || '#B8860B' }}>Product Details</h4>
-                    <p className="text-[14px] leading-relaxed whitespace-pre-wrap font-medium" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।"}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-[#EADFC8] pt-12 mt-16">
-                 <h3 className="text-2xl font-bold mb-10 border-l-4 border-[#D4AF37] pl-5 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>কাস্টমার রিভিউ ({productReviews.length})</h3>
-                 
-                 <div className="flex flex-col md:flex-row gap-10">
-                   <form onSubmit={handleReviewSubmit} className="w-full md:w-1/3 bg-[#FAF5EB] p-8 rounded-sm border border-[#EADFC8] shadow-sm h-fit">
-                      <h4 className="text-xs font-bold mb-6 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>আপনার মতামত জানান</h4>
-                      <div className="flex gap-2 mb-6">
-                         {[1,2,3,4,5].map(star => (
-                            <span key={star} onClick={() => setNewReviewRating(star)} className={`cursor-pointer text-3xl transition-colors ${star <= newReviewRating ? 'text-[#D4AF37]' : 'text-gray-300 hover:text-[#D4AF37]/50'}`}>★</span>
-                         ))}
-                      </div>
-                      <input type="text" placeholder="আপনার নাম" value={newReviewName} onChange={e => setNewReviewName(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-4 outline-none focus:border-[#D4AF37] transition-colors shadow-inner" required/>
-                      <textarea required placeholder="প্রোডাক্টটি কেমন লেগেছে?" value={newReviewComment} onChange={e => setNewReviewComment(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-6 outline-none focus:border-[#D4AF37] transition-colors custom-scrollbar shadow-inner" rows={4}></textarea>
-                      <button type="submit" disabled={isReviewSubmitting} className="w-full bg-[#111412] text-[#D4AF37] py-4 rounded-sm text-xs font-bold hover:bg-[#D4AF37] hover:text-[#111412] border border-[#D4AF37] transition-colors duration-300 shadow-sm tracking-[0.2em] uppercase">{isReviewSubmitting ? 'Submitting...' : 'Submit Review'}</button>
-                   </form>
-
-                   <div className="w-full md:w-2/3 space-y-6 max-h-[450px] overflow-y-auto custom-scrollbar pr-4">
-                      {productReviews.length === 0 ? <p className="text-xs text-gray-500 bg-[#FAF5EB] p-12 text-center border border-dashed border-[#D4AF37]/50 rounded-sm font-bold tracking-[0.2em] uppercase">এখনো কোনো রিভিউ নেই। আপনিই প্রথম রিভিউ দিন!</p> : productReviews.map(review => (
-                         <div key={review.id} className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
-                            <div className="flex justify-between items-center mb-4">
-                               <span className="font-bold text-sm text-[#111412] uppercase tracking-[0.1em]">{review.customer_name}</span>
-                               <span className="text-[#D4AF37] text-lg tracking-widest">{'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}</span>
-                            </div>
-                            <p className="text-sm mb-4 font-medium leading-relaxed" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{review.comment}</p>
-                            <p className="text-[10px] text-[#B8860B] font-bold tracking-[0.2em] uppercase">{new Date(review.created_at).toLocaleDateString()}</p>
-                         </div>
-                      ))}
-                   </div>
-                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Checkout and User Modals */}
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-[280] bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white border-2 border-[#D4AF37] w-full max-w-md relative rounded-sm shadow-2xl flex flex-col overflow-hidden max-h-[95vh]">
@@ -1156,49 +1080,31 @@ export default function Home() {
           <div className="bg-white p-8 md:p-12 rounded-sm shadow-2xl w-full max-w-md relative border-t-4 border-[#D4AF37]">
             <button onClick={() => setShowAuthModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
 
-            {authView === 'OTP' && (
-              <>
-                <div className="bg-[#FAF5EB] border-l-4 border-[#D4AF37] p-8 rounded-sm mb-8 shadow-sm mt-2">
-                  {!otpSent ? (
-                      <form onSubmit={handleSendOTP} className="space-y-5">
-                         <input required type="tel" placeholder="মোবাইল নাম্বার (e.g., 01xxxxxxxxx)" value={authPhone} onChange={e=>setAuthPhone(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] transition-colors"/>
-                         <div className="flex items-center gap-4">
-                            <span className="text-[#B8860B] font-mono font-bold text-lg min-w-[80px]">{captcha.num1} + {captcha.num2} = </span>
-                            <input required type="number" placeholder="যোগফল লিখুন" value={userCaptcha} onChange={e=>setUserCaptcha(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] transition-colors"/>
-                         </div>
-                         <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] mt-3 shadow-sm uppercase">{authLoading ? 'অপেক্ষা করুন...' : 'OTP পাঠান'}</button>
-                      </form>
-                  ) : (
-                      <form onSubmit={handleVerifyOTP} className="space-y-5">
-                         <input required type="text" placeholder="OTP কোড লিখুন" value={authOtpCode} onChange={e=>setAuthOtpCode(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] transition-colors"/>
-                         <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] mt-3 shadow-sm uppercase">{authLoading ? 'অপেক্ষা করুন...' : 'ভেরিফাই করুন'}</button>
-                      </form>
-                  )}
-                </div>
+            <h2 className="text-2xl font-bold mb-6 text-[#B8860B] text-center tracking-[0.2em] uppercase mt-2">
+              {authView === 'LOGIN' ? 'লগইন করুন' : 'অ্যাকাউন্ট খুলুন'}
+            </h2>
 
-                <div className="text-center text-[#B8860B] text-[10px] mb-6 font-bold tracking-[0.2em]">OR,</div>
-                
-                <button onClick={() => setAuthView('PASSWORD')} className="w-full bg-white border border-[#EADFC8] text-[#111412] py-4 rounded-sm font-bold text-[11px] hover:bg-[#FAF5EB] transition-colors mb-4 flex items-center justify-center gap-2 shadow-sm tracking-widest uppercase">
-                  ⚡ পাসওয়ার্ড দিয়ে লগইন করুন
-                </button>
-              </>
-            )}
+            <button onClick={handleGoogleLogin} disabled={authLoading} className="w-full bg-white border border-[#EADFC8] text-[#111412] py-3.5 rounded-sm font-bold text-[12px] hover:bg-[#FAF5EB] transition-colors mb-6 flex items-center justify-center gap-3 shadow-sm tracking-widest uppercase">
+              <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)"><path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/><path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/><path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/><path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/></g></svg>
+              Google দিয়ে কন্টিনিউ করুন
+            </button>
 
-            {(authView === 'PASSWORD' || authView === 'REGISTER') && (
-              <>
-                <h2 className="text-2xl font-bold mb-8 text-[#B8860B] text-center tracking-[0.2em] uppercase mt-2">{authView === 'PASSWORD' ? 'পাসওয়ার্ড লগইন' : 'রেজিস্টার'}</h2>
-                <form onSubmit={handleAuth} className="space-y-5">
-                  <input type="email" required placeholder="ইমেইল এড্রেস" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
-                  <input type="password" required placeholder="পাসওয়ার্ড" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
-                  <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase mt-4 shadow-md text-xs">{authLoading ? 'অপেক্ষা করুন...' : (authView === 'PASSWORD' ? 'Login' : 'Register')}</button>
-                </form>
-                <p className="text-[11px] text-center mt-8 text-gray-500 font-medium tracking-wide uppercase">
-                  {authView === 'PASSWORD' ? 'অ্যাকাউন্ট নেই? ' : 'ইতিমধ্যেই অ্যাকাউন্ট আছে? '}
-                  <span className="text-[#B8860B] font-black cursor-pointer hover:text-[#111412] transition-colors uppercase tracking-[0.2em] border-b border-transparent hover:border-[#111412] pb-0.5 ml-1" onClick={() => setAuthView(authView === 'PASSWORD' ? 'REGISTER' : 'PASSWORD')}>{authView === 'PASSWORD' ? 'Register Now' : 'Login Here'}</span>
-                </p>
-                <button onClick={() => setAuthView('OTP')} className="w-full mt-8 text-gray-400 text-[10px] font-bold hover:text-[#111412] transition-colors uppercase tracking-[0.2em] text-center">← Back to Quick Login</button>
-              </>
-            )}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-[1px] bg-[#EADFC8] flex-1"></div>
+              <span className="text-center text-[#B8860B] text-[10px] font-bold tracking-[0.2em] uppercase">OR EMAIL</span>
+              <div className="h-[1px] bg-[#EADFC8] flex-1"></div>
+            </div>
+
+            <form onSubmit={handleAuth} className="space-y-5">
+              <input type="email" required placeholder="ইমেইল এড্রেস" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+              <input type="password" required placeholder="পাসওয়ার্ড" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+              <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase mt-4 shadow-md text-xs">{authLoading ? 'অপেক্ষা করুন...' : (authView === 'LOGIN' ? 'লগইন করুন' : 'রেজিস্টার করুন')}</button>
+            </form>
+            
+            <p className="text-[11px] text-center mt-8 text-gray-500 font-medium tracking-wide uppercase">
+              {authView === 'LOGIN' ? 'অ্যাকাউন্ট নেই? ' : 'ইতিমধ্যেই অ্যাকাউন্ট আছে? '}
+              <span className="text-[#B8860B] font-black cursor-pointer hover:text-[#111412] transition-colors uppercase tracking-[0.2em] border-b border-transparent hover:border-[#111412] pb-0.5 ml-1" onClick={() => setAuthView(authView === 'LOGIN' ? 'REGISTER' : 'LOGIN')}>{authView === 'LOGIN' ? 'Register Now' : 'Login Here'}</span>
+            </p>
           </div>
         </div>
       )}
@@ -1524,7 +1430,7 @@ export default function Home() {
             </div>
             
             <form onSubmit={handleSaveProduct} className="space-y-6">
-              <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Product Name</label><input required value={newName} onChange={e => setNewName(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
+              <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Product Name (ঐচ্ছিক)</label><input value={newName} onChange={e => setNewName(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
               <div className="flex gap-6">
                 <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Regular Price (কাটা দাগ থাকবে)</label><input value={newOriginalPrice} onChange={e => setNewOriginalPrice(e.target.value)} placeholder="e.g. 1500" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
                 <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Offer Price (বর্তমান দাম)</label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
@@ -1556,16 +1462,21 @@ export default function Home() {
                 <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Category (Select or Type New)</label>
                 <input list="category-options" required placeholder="Select existing or type custom" value={newCategory} onChange={e => setNewCategory(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
                 <datalist id="category-options">
-                  {dynamicSidebarCategories.map((cat, index) => <option key={index} value={cat} />)}
+                  {allCategoryOptions.map((cat, index) => <option key={index} value={cat} />)}
                 </datalist>
                 <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-[0.2em] uppercase">Select from list to group correctly, or type new.</p>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Sub-Category (সাব-ক্যাটাগরি - ঐচ্ছিক)</label>
+                <input type="text" value={newSubCategory} onChange={e => setNewSubCategory(e.target.value)} placeholder="e.g. Winter Collection" style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+                <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-[0.2em] uppercase">Add a sub-category to filter products inside the main category.</p>
               </div>
               <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description</label><textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea></div>
               <div className="flex items-center gap-4 bg-white p-4 border border-[#EADFC8] rounded-sm shadow-sm"><input type="checkbox" checked={newInStock} onChange={e => setNewInStock(e.target.checked)} className="w-5 h-5 accent-[#D4AF37] cursor-pointer"/><label className="text-[11px] font-bold text-[#111412] uppercase tracking-[0.2em]">In Stock</label></div>
               
               <div className="flex gap-4 mt-6">
                 {editingProductId && (
-                   <button type="button" onClick={(e) => { setShowProductModal(false); handleDeleteProduct(editingProductId, e); }} className="w-1/3 bg-red-600 text-white font-bold py-5 text-[11px] rounded-sm uppercase tracking-[0.2em] hover:bg-red-700 transition-colors shadow-md">Delete</button>
+                   <button type="button" onClick={(e) => { setShowProductModal(false); handleDeleteProduct(editingProductId as string, e); }} className="w-1/3 bg-red-600 text-white font-bold py-5 text-[11px] rounded-sm uppercase tracking-[0.2em] hover:bg-red-700 transition-colors shadow-md">Delete</button>
                 )}
                 <button type="submit" disabled={isSaving || !!uploadingType} className="flex-1 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-5 text-[13px] rounded-sm uppercase tracking-[0.2em] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 shadow-md">{isSaving ? "Saving..." : "Save Product"}</button>
               </div>
