@@ -137,7 +137,6 @@ export default function Home() {
   const [newImageUrl4, setNewImageUrl4] = useState('');
   const [newDescription, setNewDescription] = useState(''); 
   
-  // Multiple Categories State
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [customCategoryStr, setCustomCategoryStr] = useState('');
   
@@ -341,7 +340,14 @@ export default function Home() {
   useEffect(() => { if(showAdminDashboard && adminTab === 'orders') fetchOrders(); }, [showAdminDashboard, adminTab]);
 
   const formatPrice = (price?: string) => price ? (price.toString().includes('৳') ? price : `${price}`) : '';
-  const getNumericPrice = (priceStr: string) => Number(priceStr.replace(/[^0-9.-]+/g,"")) || 0;
+  
+  const getNumericPrice = (priceStr: string) => {
+    if (!priceStr) return 0;
+    const engStr = String(priceStr)
+      .replace(/০/g, '0').replace(/১/g, '1').replace(/২/g, '2').replace(/৩/g, '3').replace(/৪/g, '4')
+      .replace(/৫/g, '5').replace(/৬/g, '6').replace(/৭/g, '7').replace(/৮/g, '8').replace(/৯/g, '9');
+    return Number(engStr.replace(/[^0-9.-]+/g,"")) || 0;
+  };
   
   const calculateDiscount = (original: string, current: string) => {
     const o = getNumericPrice(original), c = getNumericPrice(current);
@@ -588,7 +594,6 @@ export default function Home() {
     setActiveSubCategories(prev => ({ ...prev, [catName]: subName }));
   };
 
-  // সম্পূর্ণ ডাইনামিক ক্যাটাগরি তৈরি 
   const specialCategories = ["⚡ ফ্লাশ সেল", "নতুন কালেকশন", "এক্সক্লুসিভ", "সকল ব্র্যান্ড"];
   const allDynamicCats = products.flatMap(p => (p.category || '').split(',').map(c=>c.trim())).filter(Boolean);
   
@@ -612,7 +617,7 @@ export default function Home() {
       <div key={item.id} className="bg-white border border-[#EADFC8] flex flex-col relative w-full overflow-hidden hover:shadow-[0_8px_30px_rgb(212,175,55,0.15)] hover:border-[#D4AF37] transition-all duration-500 group cursor-pointer rounded-md" onClick={() => { setViewingProduct(item); setActiveImage(item.image_url || ''); setSelectedQuantity(1); }}>
         
         {discount > 0 && (
-          <div className="absolute top-2 right-2 bg-[#D4AF37] text-white text-[10px] font-bold rounded-full w-9 h-9 flex flex-col items-center justify-center z-10 leading-tight shadow-md">
+          <div className="absolute top-2 right-2 bg-red-500 text-white text-[11px] font-bold rounded-full w-10 h-10 flex flex-col items-center justify-center z-10 leading-tight shadow-md border-2 border-white">
             {discount}%<span className="text-[8px] font-normal">ছাড়</span>
           </div>
         )}
@@ -773,7 +778,7 @@ export default function Home() {
 
                       return (
                         <div key={section.id} className="w-full">
-                          <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
+                          <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-8">
                              <h2 className="font-bold tracking-wide" style={{ fontSize: `${section.fontSize || 32}px`, color: section.color || storeSettings.heading_color || '#B8860B' }}>{section.title}</h2>
                              <button onClick={() => {setActiveCategory(section.title); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
                           </div>
@@ -813,7 +818,7 @@ export default function Home() {
 
                       return (
                         <div key={catTitle} className="w-full">
-                          <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
+                          <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-8">
                              <h2 className="text-2xl md:text-3xl font-bold tracking-wide" style={{ color: storeSettings.heading_color || '#B8860B' }}>{catTitle}</h2>
                              <button onClick={() => {setActiveCategory(catTitle); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
                           </div>
@@ -935,7 +940,9 @@ export default function Home() {
           </>
         )}
 
-        {viewingProduct && (
+        {viewingProduct && (() => {
+          const viewingDiscount = viewingProduct.original_price ? calculateDiscount(viewingProduct.original_price, viewingProduct.price) : 0;
+          return (
           <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto" onClick={() => setViewingProduct(null)}>
             <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-4 md:px-8 md:py-5 shadow-sm sticky top-0 z-30">
@@ -968,6 +975,11 @@ export default function Home() {
                      <div className="flex items-end gap-4 mb-5 border-b border-[#EADFC8] pb-5">
                        {viewingProduct.original_price && <span className="text-gray-400 line-through text-lg font-medium">৳ {formatPrice(viewingProduct.original_price)}</span>}
                        <span className="text-[#B8860B] text-3xl font-black">{formatPrice(viewingProduct.price)} ৳</span>
+                       {viewingDiscount > 0 && (
+                          <span className="bg-red-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-sm ml-2 mb-1.5 animate-pulse shadow-sm">
+                            {viewingDiscount}% ছাড়
+                          </span>
+                       )}
                      </div>
 
                      <div className="flex flex-col gap-2 mb-6 text-xs text-gray-600 font-bold tracking-wide">
@@ -989,54 +1001,55 @@ export default function Home() {
                          </button>
                          <a href={`https://wa.me/88${storeSettings.phone}?text=Hello, I want to order: ${viewingProduct.name}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#20b958] transition-colors duration-300 text-sm flex justify-center items-center gap-2 uppercase tracking-widest shadow-sm">
                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                       হোয়াটসঅ্যাপ অর্ডার
-                     </a>
-                     <a href={`tel:${storeSettings.phone}`} className="w-full bg-[#3d3d3d] text-white font-bold py-4 rounded-sm hover:bg-[#222] transition-colors duration-300 text-sm flex justify-center items-center gap-2 uppercase tracking-widest shadow-sm">
-                       📞 কল অর্ডার {storeSettings.phone}
-                     </a>
-                 </div>
+                           হোয়াটসঅ্যাপ অর্ডার
+                         </a>
+                         <a href={`tel:${storeSettings.phone}`} className="w-full bg-[#3d3d3d] text-white font-bold py-4 rounded-sm hover:bg-[#222] transition-colors duration-300 text-sm flex justify-center items-center gap-2 uppercase tracking-widest shadow-sm">
+                           📞 কল অর্ডার {storeSettings.phone}
+                         </a>
+                     </div>
 
-                 <div className="text-gray-700 bg-[#FAF5EB] p-6 rounded-sm border border-[#EADFC8]">
-                    <h4 className="text-sm font-bold mb-3 uppercase tracking-widest border-b border-[#D4AF37]/30 pb-2 inline-block" style={{ color: storeSettings.heading_color || '#B8860B' }}>PRODUCT DETAILS</h4>
-                    <p className="text-[13px] leading-relaxed whitespace-pre-wrap font-medium" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।"}</p>
-                 </div>
+                     <div className="text-gray-700 bg-[#FAF5EB] p-6 rounded-sm border border-[#EADFC8]">
+                        <h4 className="text-sm font-bold mb-3 uppercase tracking-widest border-b border-[#D4AF37]/30 pb-2 inline-block" style={{ color: storeSettings.heading_color || '#B8860B' }}>PRODUCT DETAILS</h4>
+                        <p className="text-[13px] leading-relaxed whitespace-pre-wrap font-medium" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।"}</p>
+                     </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-[#EADFC8] pt-12 mt-16">
+                   <h3 className="text-2xl font-bold mb-10 border-l-4 border-[#D4AF37] pl-5 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>কাস্টমার রিভিউ ({productReviews.length})</h3>
+                   
+                   <div className="flex flex-col md:flex-row gap-10">
+                     <form onSubmit={handleReviewSubmit} className="w-full md:w-1/3 bg-[#FAF5EB] p-8 rounded-sm border border-[#EADFC8] shadow-sm h-fit">
+                        <h4 className="text-xs font-bold mb-6 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>আপনার মতামত জানান</h4>
+                        <div className="flex gap-2 mb-6">
+                           {[1,2,3,4,5].map(star => (
+                              <span key={star} onClick={() => setNewReviewRating(star)} className={`cursor-pointer text-3xl transition-colors ${star <= newReviewRating ? 'text-[#D4AF37]' : 'text-gray-300 hover:text-[#D4AF37]/50'}`}>★</span>
+                           ))}
+                        </div>
+                        <input type="text" placeholder="আপনার নাম" value={newReviewName} onChange={e => setNewReviewName(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-4 outline-none focus:border-[#D4AF37] transition-colors shadow-inner" required/>
+                        <textarea required placeholder="প্রোডাক্টটি কেমন লেগেছে?" value={newReviewComment} onChange={e => setNewReviewComment(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-6 outline-none focus:border-[#D4AF37] transition-colors custom-scrollbar shadow-inner" rows={4}></textarea>
+                        <button type="submit" disabled={isReviewSubmitting} className="w-full bg-[#111412] text-[#D4AF37] py-4 rounded-sm text-xs font-bold hover:bg-[#D4AF37] hover:text-[#111412] border border-[#D4AF37] transition-colors duration-300 shadow-sm tracking-[0.2em] uppercase">{isReviewSubmitting ? 'Submitting...' : 'Submit Review'}</button>
+                     </form>
+
+                     <div className="w-full md:w-2/3 space-y-6 max-h-[450px] overflow-y-auto custom-scrollbar pr-4">
+                        {productReviews.length === 0 ? <p className="text-xs text-gray-500 bg-[#FAF5EB] p-12 text-center border border-dashed border-[#D4AF37]/50 rounded-sm font-bold tracking-[0.2em] uppercase">এখনো কোনো রিভিউ নেই। আপনিই প্রথম রিভিউ দিন!</p> : productReviews.map(review => (
+                           <div key={review.id} className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
+                              <div className="flex justify-between items-center mb-4">
+                                 <span className="font-bold text-sm text-[#111412] uppercase tracking-[0.1em]">{review.customer_name}</span>
+                                 <span className="text-[#D4AF37] text-lg tracking-widest">{'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}</span>
+                              </div>
+                              <p className="text-sm mb-4 font-medium leading-relaxed" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{review.comment}</p>
+                              <p className="text-[10px] text-[#B8860B] font-bold tracking-[0.2em] uppercase">{new Date(review.created_at).toLocaleDateString()}</p>
+                           </div>
+                        ))}
+                     </div>
+                   </div>
+                </div>
               </div>
             </div>
-            
-            <div className="border-t border-[#EADFC8] pt-12 mt-16">
-               <h3 className="text-2xl font-bold mb-10 border-l-4 border-[#D4AF37] pl-5 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>কাস্টমার রিভিউ ({productReviews.length})</h3>
-               
-               <div className="flex flex-col md:flex-row gap-10">
-                 <form onSubmit={handleReviewSubmit} className="w-full md:w-1/3 bg-[#FAF5EB] p-8 rounded-sm border border-[#EADFC8] shadow-sm h-fit">
-                    <h4 className="text-xs font-bold mb-6 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>আপনার মতামত জানান</h4>
-                    <div className="flex gap-2 mb-6">
-                       {[1,2,3,4,5].map(star => (
-                          <span key={star} onClick={() => setNewReviewRating(star)} className={`cursor-pointer text-3xl transition-colors ${star <= newReviewRating ? 'text-[#D4AF37]' : 'text-gray-300 hover:text-[#D4AF37]/50'}`}>★</span>
-                       ))}
-                    </div>
-                    <input type="text" placeholder="আপনার নাম" value={newReviewName} onChange={e => setNewReviewName(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-4 outline-none focus:border-[#D4AF37] transition-colors shadow-inner" required/>
-                    <textarea required placeholder="প্রোডাক্টটি কেমন লেগেছে?" value={newReviewComment} onChange={e => setNewReviewComment(e.target.value)} className="w-full bg-white border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-6 outline-none focus:border-[#D4AF37] transition-colors custom-scrollbar shadow-inner" rows={4}></textarea>
-                    <button type="submit" disabled={isReviewSubmitting} className="w-full bg-[#111412] text-[#D4AF37] py-4 rounded-sm text-xs font-bold hover:bg-[#D4AF37] hover:text-[#111412] border border-[#D4AF37] transition-colors duration-300 shadow-sm tracking-[0.2em] uppercase">{isReviewSubmitting ? 'Submitting...' : 'Submit Review'}</button>
-                 </form>
-
-                 <div className="w-full md:w-2/3 space-y-6 max-h-[450px] overflow-y-auto custom-scrollbar pr-4">
-                    {productReviews.length === 0 ? <p className="text-xs text-gray-500 bg-[#FAF5EB] p-12 text-center border border-dashed border-[#D4AF37]/50 rounded-sm font-bold tracking-[0.2em] uppercase">এখনো কোনো রিভিউ নেই। আপনিই প্রথম রিভিউ দিন!</p> : productReviews.map(review => (
-                       <div key={review.id} className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
-                          <div className="flex justify-between items-center mb-4">
-                             <span className="font-bold text-sm text-[#111412] uppercase tracking-[0.1em]">{review.customer_name}</span>
-                             <span className="text-[#D4AF37] text-lg tracking-widest">{'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}</span>
-                          </div>
-                          <p className="text-sm mb-4 font-medium leading-relaxed" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{review.comment}</p>
-                          <p className="text-[10px] text-[#B8860B] font-bold tracking-[0.2em] uppercase">{new Date(review.created_at).toLocaleDateString()}</p>
-                       </div>
-                    ))}
-                 </div>
-               </div>
-            </div>
           </div>
-        </div>
-      </div>
-    )}
+          );
+        })()}
 
         {isCheckoutOpen && (
           <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 z-[1000]" onClick={() => setIsCheckoutOpen(false)}>
