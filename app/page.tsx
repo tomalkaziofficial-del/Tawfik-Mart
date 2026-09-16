@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
-import WhatsAppButton from './components/WhatsAppButton'; 
 
 interface Product {
   id: string; 
@@ -67,10 +66,22 @@ const fontOptions = [
   { name: "Roboto (English Standard)", value: "'Roboto', sans-serif" }
 ];
 
+const ADMIN_EMAIL = "kazitomalislam7@gmail.com";
+
+const getProductViews = (id: string) => {
+  if (!id) return 1200;
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash % 4000) + 1200; 
+};
+
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeSubCategories, setActiveSubCategories] = useState<Record<string, string>>({});
 
@@ -137,7 +148,6 @@ export default function Home() {
   const [newImageUrl4, setNewImageUrl4] = useState('');
   const [newDescription, setNewDescription] = useState(''); 
   
-  // Multiple Categories State
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [customCategoryStr, setCustomCategoryStr] = useState('');
   
@@ -162,6 +172,7 @@ export default function Home() {
     brand_name_color: '#B8860B',
     heading_color: '#B8860B',
     page_text_color: '#374151',
+    fb_page_url: 'https://www.facebook.com/',
     contact_info: 'অফিস: ঢাকা\nফোন: 01632331534\nইমেইল: support@zeenat.com',
     return_policy: 'পণ্য হাতে পাওয়ার পর যদি কোনো ত্রুটি থাকে, তবে ২৪ ঘণ্টার মধ্যে আমাদের সাথে যোগাযোগ করুন।',
     delivery_policy: 'ঢাকার ভেতরে ডেলিভারি চার্জ ৬০ টাকা (১-২ দিন)।\nঢাকার বাইরে ডেলিভারি চার্জ ১২০ টাকা (২-৪ দিন)।',
@@ -175,6 +186,8 @@ export default function Home() {
   
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+
+  const isAdmin = user && user.email === ADMIN_EMAIL;
 
   useEffect(() => {
     if (showAuthModal) {
@@ -284,7 +297,7 @@ export default function Home() {
         if (!loadedSections || !Array.isArray(loadedSections)) {
             loadedSections = [];
             Object.keys(safeCatBanners).forEach(key => {
-                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR'].includes(key)) {
+                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL'].includes(key)) {
                     loadedSections.push({ id: Date.now().toString() + Math.random(), title: key, fontSize: 36, imageUrl: safeCatBanners[key], color: '#B8860B', imageHeight: 300 });
                 }
             });
@@ -296,6 +309,7 @@ export default function Home() {
           ...data, 
           shop_name: data.shop_name || 'Zeenat Mart', 
           phone: data.phone || '01632331534', 
+          fb_page_url: safeCatBanners['FB_PAGE_URL'] || 'https://www.facebook.com/',
           banners: safeBanners, 
           category_banners: safeCatBanners,
           contact_info: safeCatBanners['TXT_CONTACT'] || prev.contact_info,
@@ -544,7 +558,8 @@ export default function Home() {
          'FONT_FAMILY': storeSettings.font_family,
          'BRAND_NAME_COLOR': storeSettings.brand_name_color,
          'HEADING_COLOR': storeSettings.heading_color,
-         'PAGE_TEXT_COLOR': storeSettings.page_text_color
+         'PAGE_TEXT_COLOR': storeSettings.page_text_color,
+         'FB_PAGE_URL': storeSettings.fb_page_url
       };
       const { error } = await supabase.from('store_settings').update({ shop_name: storeSettings.shop_name, phone: storeSettings.phone, category_banners: newCatBanners }).eq('id', 1);
       if(error) throw error; 
@@ -605,7 +620,16 @@ export default function Home() {
   
   const allCategoryOptions = Array.from(new Set([...specialCategories, ...dynamicSidebarCategories]));
 
-  const filteredProducts = products.filter(item => (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredProducts = products.filter(item => 
+    (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.id || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredAdminProducts = products.filter(item => 
+    (item.name || '').toLowerCase().includes(adminSearchQuery.toLowerCase()) ||
+    (item.id || '').toLowerCase().includes(adminSearchQuery.toLowerCase())
+  );
+  
   const bgImage = storeSettings.category_banners?.['WEBSITE_BG'];
   const isBgVisible = storeSettings.bg_enabled && bgImage;
   const renderedCategories = new Set<string>();
@@ -627,7 +651,7 @@ export default function Home() {
           {inWishlist ? <span className="text-red-500 text-sm">❤️</span> : <span className="text-gray-400 text-sm hover:text-[#D4AF37]">🤍</span>}
         </button>
         
-        {isAdminView && (
+        {isAdminView && isAdmin && (
           <div className="absolute top-12 left-2 z-10 flex flex-col gap-1">
              <button onClick={(e) => openEditModal(item, e)} className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded shadow hover:bg-blue-700 transition">Edit</button>
              <button onClick={(e) => handleDeleteProduct(item.id, e)} className="bg-red-600 text-white text-[10px] px-2 py-1 rounded shadow hover:bg-red-700 transition">Delete</button>
@@ -714,7 +738,7 @@ export default function Home() {
             </div>
 
             <div className="w-full md:w-1/2 flex border border-[#EADFC8] rounded-md overflow-hidden bg-[#FAF5EB] shadow-inner focus-within:border-[#D4AF37] transition-colors">
-              <input type="text" placeholder="পণ্য খুঁজুন এখানে..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full py-3 pl-5 pr-10 text-sm text-[#111412] outline-none bg-transparent font-medium" />
+              <input type="text" placeholder="পণ্য বা প্রোডাক্ট আইডি খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full py-3 pl-5 pr-10 text-sm text-[#111412] outline-none bg-transparent font-medium" />
               <button className="bg-[#111412] text-[#D4AF37] px-8 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold tracking-widest">খুঁজুন</button>
             </div>
 
@@ -768,6 +792,8 @@ export default function Home() {
                  <>
                    {customSections.map(section => {
                       renderedCategories.add(section.title);
+                      
+                      if (activeCategory === 'All' && specialCategories.includes(section.title)) return null;
                       if (activeCategory !== 'All' && activeCategory !== section.title) return null;
                       
                       const catProducts = filteredProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(section.title));
@@ -795,7 +821,7 @@ export default function Home() {
                           
                           {section.imageUrl && activeCategory === 'All' && (
                             <div className="w-full mb-10 shadow-md rounded-sm overflow-hidden border border-[#EADFC8] relative bg-[#FAF5EB]" style={{ height: section.imageHeight ? `${section.imageHeight}px` : '300px' }}>
-                              <img src={section.imageUrl} alt={section.title} className="w-full h-full object-fill absolute inset-0" />
+                              <img src={section.imageUrl} alt={section.title} className="w-full h-full absolute inset-0" style={{ objectFit: 'fill', width: '100%', height: '100%' }} />
                             </div>
                           )}
 
@@ -808,6 +834,8 @@ export default function Home() {
 
                    {dynamicSidebarCategories.map(catTitle => {
                       if (renderedCategories.has(catTitle)) return null;
+                      
+                      if (activeCategory === 'All' && specialCategories.includes(catTitle)) return null;
                       if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
                       
                       const catProducts = filteredProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(catTitle));
@@ -865,17 +893,24 @@ export default function Home() {
 
         </div> 
 
-        <WhatsAppButton />
+        {/* Facebook Messenger Floating Button */}
+        {storeSettings.fb_page_url && (
+           <a href={storeSettings.fb_page_url} target="_blank" rel="noopener noreferrer" className="fixed bottom-20 right-6 z-[250] bg-[#1877F2] text-white p-3.5 rounded-full shadow-2xl hover:bg-[#166FE5] transition-transform hover:scale-110 border-2 border-white">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 0C5.373 0 0 5.068 0 11.321c0 3.565 1.763 6.744 4.538 8.87v3.809l4.168-2.292c1.05.292 2.158.448 3.294.448 6.627 0 12-5.068 12-11.321S18.627 0 12 0zm1.206 15.352l-3.08-3.295-6.002 3.295 6.623-7.039 3.167 3.295 5.915-3.295-6.623 7.039z"/></svg>
+           </a>
+        )}
 
-        <div className="fixed bottom-0 left-0 w-full bg-[#111412] text-[#D4AF37] border-t border-[#D4AF37]/30 z-[250] flex justify-between items-center px-6 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-          <div className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span> Premium Admin
+        {isAdmin && (
+          <div className="fixed bottom-0 left-0 w-full bg-[#111412] text-[#D4AF37] border-t border-[#D4AF37]/30 z-[250] flex justify-between items-center px-6 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+            <div className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span> Premium Admin
+            </div>
+            <div className="flex gap-3">
+               <button onClick={openAddModal} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">+ Add</button>
+               <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.2em] uppercase">⚙️ Settings</button>
+            </div>
           </div>
-          <div className="flex gap-3">
-             <button onClick={openAddModal} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">+ Add</button>
-             <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.2em] uppercase">⚙️ Settings</button>
-          </div>
-        </div>
+        )}
       </main>
 
       {/* ALL MODALS PLACED OUTSIDE <MAIN> TO PREVENT Z-INDEX AND CSS CLIPPING ISSUES */}
@@ -985,7 +1020,7 @@ export default function Home() {
 
                      <div className="flex flex-col gap-2 mb-6 text-xs text-gray-600 font-bold tracking-wide">
                         <p className="flex items-center gap-2"><span className="text-base">🎁</span> প্রোডাক্ট আইডি: {viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}</p>
-                        <p className="flex items-center gap-2"><span className="text-base">👁️</span> ভিউ হয়েছে: {Math.floor(Math.random() * 5000) + 1000}</p>
+                        <p className="flex items-center gap-2"><span className="text-base">👁️</span> ভিউ হয়েছে: {getProductViews(viewingProduct.id)}</p>
                         {viewingProduct.in_stock !== false && <p className="flex items-center gap-2 text-green-600"><span className="text-base">✅</span> স্টকে আছে</p>}
                      </div>
 
@@ -1000,9 +1035,9 @@ export default function Home() {
                          <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); setIsCartOpen(true); setViewingProduct(null); }} disabled={!viewingProduct.in_stock} className="w-full bg-[#2a2a2a] text-white font-bold py-4 rounded-sm hover:bg-[#444] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
                            🛒 ব্যাগে যোগ
                          </button>
-                         <a href={`https://wa.me/88${storeSettings.phone}?text=Hello, I want to order: ${viewingProduct.name}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#20b958] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
-                           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                           হোয়াটসঅ্যাপ অর্ডার
+                         <a href={storeSettings.fb_page_url} target="_blank" rel="noopener noreferrer" className="w-full bg-[#1877F2] text-white font-bold py-4 rounded-sm hover:bg-[#166FE5] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
+                           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                           ফেসবুকে মেসেজ দিন
                          </a>
                          <a href={`tel:${storeSettings.phone}`} className="w-full bg-[#3d3d3d] text-white font-bold py-4 rounded-sm hover:bg-[#222] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
                            📞 কল অর্ডার {storeSettings.phone}
@@ -1478,7 +1513,7 @@ export default function Home() {
                             </div>
                             
                             <div className="w-full md:w-2/3 bg-[#FAF5EB] border border-[#D4AF37]/50 rounded-sm flex items-center justify-center overflow-hidden shadow-sm" style={{ height: section.imageHeight ? `${section.imageHeight}px` : '300px' }}>
-                               {section.imageUrl ? <img src={section.imageUrl} className="w-full h-full object-fill p-0"/> : <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">No Banner Uploaded</span>}
+                               {section.imageUrl ? <img src={section.imageUrl} className="w-full h-full" style={{ objectFit: 'fill', width: '100%', height: '100%' }} /> : <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">No Banner Uploaded</span>}
                             </div>
                           </div>
                         ))}
@@ -1498,6 +1533,10 @@ export default function Home() {
                            <div>
                               <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Contact Info (যোগাযোগ)</label>
                               <textarea rows={3} value={storeSettings.contact_info} onChange={e=>setStoreSettings({...storeSettings, contact_info: e.target.value})} style={{color: storeSettings.page_text_color}} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner"></textarea>
+                           </div>
+                           <div>
+                              <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Facebook Page URL</label>
+                              <input type="text" value={storeSettings.fb_page_url} onChange={e=>setStoreSettings({...storeSettings, fb_page_url: e.target.value})} style={{color: storeSettings.page_text_color}} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner" />
                            </div>
                            <div>
                               <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Return Policy (রিটার্ন পলিসি)</label>
@@ -1552,8 +1591,24 @@ export default function Home() {
                 )}
 
                 {adminTab === 'products' && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {products.map(item => renderProductCard(item, true))}
+                  <div>
+                    <div className="mb-6 flex justify-between items-center bg-[#FAF5EB] p-4 border border-[#EADFC8] rounded-sm shadow-sm">
+                      <h3 className="font-bold text-sm text-[#111412] tracking-[0.2em] uppercase">All Products ({products.length})</h3>
+                      <input 
+                         type="text" 
+                         placeholder="Search by Name or ID..." 
+                         value={adminSearchQuery} 
+                         onChange={e => setAdminSearchQuery(e.target.value)} 
+                         className="w-full md:w-1/3 bg-white border border-[#EADFC8] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                      {filteredAdminProducts.length > 0 ? (
+                         filteredAdminProducts.map(item => renderProductCard(item, true))
+                      ) : (
+                         <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found matching your search</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
