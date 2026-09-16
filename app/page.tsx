@@ -136,7 +136,11 @@ export default function Home() {
   const [newImageUrl3, setNewImageUrl3] = useState(''); 
   const [newImageUrl4, setNewImageUrl4] = useState('');
   const [newDescription, setNewDescription] = useState(''); 
-  const [newCategory, setNewCategory] = useState('');
+  
+  // Multiple Categories State
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [customCategoryStr, setCustomCategoryStr] = useState('');
+  
   const [newSubCategory, setNewSubCategory] = useState(''); 
   const [newBrand, setNewBrand] = useState(''); 
   const [newColor, setNewColor] = useState(''); 
@@ -148,7 +152,7 @@ export default function Home() {
   const [customSections, setCustomSections] = useState<{id: string, title: string, fontSize: number, imageUrl: string, color?: string}[]>([]);
 
   const [storeSettings, setStoreSettings] = useState({
-    shop_name: 'ZEENAT', 
+    shop_name: 'Zeenat Mart', 
     phone: '01632331534',
     logo_url: '',
     flashDealActive: true,
@@ -290,7 +294,7 @@ export default function Home() {
         setStoreSettings(prev => ({ 
           ...prev, 
           ...data, 
-          shop_name: data.shop_name || 'ZEENAT', 
+          shop_name: data.shop_name || 'Zeenat Mart', 
           phone: data.phone || '01632331534', 
           banners: safeBanners, 
           category_banners: safeCatBanners,
@@ -541,15 +545,23 @@ export default function Home() {
     } catch (error: any) { alert("সেটিংস সেভ করতে সমস্যা হয়েছে:\n" + (error.message || JSON.stringify(error))); }
   };
 
+  const handleCategoryToggle = (cat: string) => {
+    if (selectedCategories.includes(cat)) {
+        setSelectedCategories(selectedCategories.filter(c => c !== cat));
+    } else {
+        setSelectedCategories([...selectedCategories, cat]);
+    }
+  };
+
   const openAddModal = () => { 
     setEditingProductId(null); setNewName(''); setNewPrice(''); setNewOriginalPrice(''); setNewImageUrl(''); setNewImageUrl2(''); setNewImageUrl3(''); setNewImageUrl4('');
-    setNewDescription(''); setNewCategory(''); setNewSubCategory(''); setNewBrand(''); setNewColor(''); setNewInStock(true); setShowProductModal(true); setShowAdminDashboard(false); 
+    setNewDescription(''); setSelectedCategories([]); setCustomCategoryStr(''); setNewSubCategory(''); setNewBrand(''); setNewColor(''); setNewInStock(true); setShowProductModal(true); setShowAdminDashboard(false); 
   };
   
   const openEditModal = (product: Product, e: React.MouseEvent) => { 
     e.stopPropagation(); setEditingProductId(product.id); setNewName(product.name || ''); setNewPrice(product.price || ''); setNewOriginalPrice(product.original_price || ''); 
     setNewImageUrl(product.image_url || ''); setNewImageUrl2(product.image_url_2 || ''); setNewImageUrl3(product.image_url_3 || ''); setNewImageUrl4(product.image_url_4 || '');
-    setNewDescription(product.description || ''); setNewCategory(product.category); setNewSubCategory(product.tag || ''); setNewBrand(product.brand || ''); setNewColor(product.color || ''); setNewInStock(product.in_stock !== false); setShowProductModal(true); setShowAdminDashboard(false);
+    setNewDescription(product.description || ''); setSelectedCategories(product.category ? product.category.split(',').map(c => c.trim()) : []); setCustomCategoryStr(''); setNewSubCategory(product.tag || ''); setNewBrand(product.brand || ''); setNewColor(product.color || ''); setNewInStock(product.in_stock !== false); setShowProductModal(true); setShowAdminDashboard(false);
   };
   
   const handleDeleteProduct = async (id: string, e?: React.MouseEvent) => { 
@@ -561,10 +573,11 @@ export default function Home() {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault(); setIsSaving(true);
     try {
+      const finalCategories = Array.from(new Set([...selectedCategories, ...customCategoryStr.split(',').map(c=>c.trim()).filter(Boolean)]));
       const productData = { 
         name: newName || '', price: newPrice, original_price: newOriginalPrice || null, 
         image_url: newImageUrl || null, image_url_2: newImageUrl2 || null, image_url_3: newImageUrl3 || null, image_url_4: newImageUrl4 || null, 
-        description: newDescription || null, category: newCategory || "New Category", in_stock: newInStock, tag: newSubCategory, brand: newBrand || null, color: newColor || null
+        description: newDescription || null, category: finalCategories.length > 0 ? finalCategories.join(', ') : "New Category", in_stock: newInStock, tag: newSubCategory, brand: newBrand || null, color: newColor || null
       };
       if (editingProductId) await supabase.from('products').update(productData).eq('id', editingProductId); else await supabase.from('products').insert([productData]);
       setShowProductModal(false); fetchProducts(); alert("সফলভাবে সেভ হয়েছে!");
@@ -577,9 +590,11 @@ export default function Home() {
 
   // সম্পূর্ণ ডাইনামিক ক্যাটাগরি তৈরি 
   const specialCategories = ["⚡ ফ্লাশ সেল", "নতুন কালেকশন", "এক্সক্লুসিভ", "সকল ব্র্যান্ড"];
+  const allDynamicCats = products.flatMap(p => (p.category || '').split(',').map(c=>c.trim())).filter(Boolean);
+  
   const dynamicSidebarCategories = Array.from(new Set([
     ...customSections.map(c => c.title), 
-    ...products.map(p => p.category).filter(Boolean)
+    ...allDynamicCats
   ]));
   
   const allCategoryOptions = Array.from(new Set([...specialCategories, ...dynamicSidebarCategories]));
@@ -622,7 +637,7 @@ export default function Home() {
         </div>
         
         <div className="p-4 flex flex-col items-center text-center flex-grow bg-white">
-          <p className="text-[9px] text-[#D4AF37] font-bold uppercase tracking-[0.2em] mb-1.5">{item.tag || item.category}</p>
+          <p className="text-[9px] text-[#D4AF37] font-bold uppercase tracking-[0.2em] mb-1.5">{item.tag || item.category.split(',')[0]}</p>
           {item.name && item.name !== '' && <h4 className="text-[13px] text-[#111412] font-bold mb-2 line-clamp-1">{item.name}</h4>}
           
           <div className="flex flex-col items-center justify-center mb-4 mt-auto w-full leading-tight">
@@ -747,7 +762,8 @@ export default function Home() {
                  {customSections.map(section => {
                     renderedCategories.add(section.title);
                     if (activeCategory !== 'All' && activeCategory !== section.title) return null;
-                    const catProducts = filteredProducts.filter(item => item.category === section.title);
+                    
+                    const catProducts = filteredProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(section.title));
                     if (catProducts.length === 0 && !section.imageUrl) return null;
 
                     const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
@@ -786,7 +802,8 @@ export default function Home() {
                  {dynamicSidebarCategories.map(catTitle => {
                     if (renderedCategories.has(catTitle)) return null;
                     if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
-                    const catProducts = filteredProducts.filter(item => item.category === catTitle);
+                    
+                    const catProducts = filteredProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(catTitle));
                     if (catProducts.length === 0) return null;
 
                     const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
@@ -848,7 +865,7 @@ export default function Home() {
           <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span> Premium Admin
         </div>
         <div className="flex gap-3">
-           <button onClick={() => { setEditingProductId(null); setNewName(''); setNewPrice(''); setNewOriginalPrice(''); setNewImageUrl(''); setNewImageUrl2(''); setNewImageUrl3(''); setNewImageUrl4(''); setNewDescription(''); setNewCategory(''); setNewSubCategory(''); setNewBrand(''); setNewColor(''); setNewInStock(true); setShowProductModal(true); setShowAdminDashboard(false); }} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">+ Add</button>
+           <button onClick={openAddModal} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">+ Add</button>
            <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.2em] uppercase">⚙️ Settings</button>
         </div>
       </div>
@@ -1435,6 +1452,7 @@ export default function Home() {
                 <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Regular Price (কাটা দাগ থাকবে)</label><input value={newOriginalPrice} onChange={e => setNewOriginalPrice(e.target.value)} placeholder="e.g. 1500" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
                 <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Offer Price (বর্তমান দাম)</label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
               </div>
+              
               <div className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm">
                 <span className="text-[10px] font-bold block mb-5 text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Product Images (Max 4)</span>
                 <div className="grid grid-cols-2 gap-5">
@@ -1458,19 +1476,26 @@ export default function Home() {
                   ))}
                 </div>
               </div>
+
               <div>
-                <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Category (Select or Type New)</label>
-                <input list="category-options" required placeholder="Select existing or type custom" value={newCategory} onChange={e => setNewCategory(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
-                <datalist id="category-options">
-                  {allCategoryOptions.map((cat, index) => <option key={index} value={cat} />)}
-                </datalist>
-                <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-[0.2em] uppercase">Select from list to group correctly, or type new.</p>
+                <label className="block text-[10px] font-bold mb-3 text-[#B8860B] uppercase tracking-[0.2em]">Select Categories (Multiple)</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-[#FAF5EB] p-4 border border-[#EADFC8] rounded-sm max-h-40 overflow-y-auto custom-scrollbar">
+                  {allCategoryOptions.map((cat, index) => (
+                     <label key={index} className="flex items-center gap-2 cursor-pointer text-[11px] font-bold text-[#111412] bg-white p-2 border border-[#EADFC8] rounded-sm shadow-sm hover:border-[#D4AF37] transition-colors">
+                       <input type="checkbox" checked={selectedCategories.includes(cat)} onChange={() => handleCategoryToggle(cat)} className="accent-[#D4AF37] w-4 h-4 cursor-pointer flex-shrink-0"/>
+                       <span className="truncate">{cat}</span>
+                     </label>
+                  ))}
+                </div>
+                <input type="text" value={customCategoryStr} onChange={e => setCustomCategoryStr(e.target.value)} placeholder="অথবা নতুন ক্যাটাগরি লিখুন (কমা দিয়ে একাধিক লিখতে পারেন)" style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors mt-3"/>
               </div>
+
               <div>
                 <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Sub-Category (সাব-ক্যাটাগরি - ঐচ্ছিক)</label>
                 <input type="text" value={newSubCategory} onChange={e => setNewSubCategory(e.target.value)} placeholder="e.g. Winter Collection" style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
                 <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-[0.2em] uppercase">Add a sub-category to filter products inside the main category.</p>
               </div>
+
               <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description</label><textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea></div>
               <div className="flex items-center gap-4 bg-white p-4 border border-[#EADFC8] rounded-sm shadow-sm"><input type="checkbox" checked={newInStock} onChange={e => setNewInStock(e.target.checked)} className="w-5 h-5 accent-[#D4AF37] cursor-pointer"/><label className="text-[11px] font-bold text-[#111412] uppercase tracking-[0.2em]">In Stock</label></div>
               
