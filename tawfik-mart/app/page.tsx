@@ -87,8 +87,8 @@ export default function Home() {
 
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [activeImage, setActiveImage] = useState<string>(''); 
-
+  const [activeImage, setActiveImage] = useState<string>(''); // FIXED: Error resolved here
+  
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCartLoaded, setIsCartLoaded] = useState(false);
@@ -108,7 +108,6 @@ export default function Home() {
   const [isReviewSubmitting, setIsReviewSubmitting] = useState(false);
 
   const [shippingLocation, setShippingLocation] = useState<'inside' | 'outside'>('inside');
-  const shippingFee = shippingLocation === 'inside' ? 60 : 120;
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'bKash' | 'Nagad' | 'Rocket'>('COD');
@@ -169,6 +168,7 @@ export default function Home() {
   const [toastMessage, setToastMessage] = useState<{msg: string, type: 'success'|'error'} | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<{show: boolean, orderId: string}>({show: false, orderId: ''});
   const [fomoMsg, setFomoMsg] = useState<Product | null>(null);
+  const [animateCart, setAnimateCart] = useState(false);
 
   const [storeSettings, setStoreSettings] = useState({
     shop_name: 'Zeenat Mart', 
@@ -183,7 +183,8 @@ export default function Home() {
     page_text_color: '#374151',
     fb_page_url: 'https://m.me/61581595917703',
     default_sort: 'lowToHigh', 
-    category_order: '', // NEW: To handle category display order
+    category_order: '', 
+    free_delivery_threshold: 1400, 
     contact_info: 'অফিস: ঢাকা\nফোন: 01632331534\nইমেইল: support@zeenat.com',
     return_policy: 'পণ্য হাতে পাওয়ার পর যদি কোনো ত্রুটি থাকে, তবে ২৪ ঘণ্টার মধ্যে আমাদের সাথে যোগাযোগ করুন।',
     delivery_policy: 'ঢাকার ভেতরে ডেলিভারি চার্জ ৬০ টাকা (১-২ দিন)।\nঢাকার বাইরে ডেলিভারি চার্জ ১২০ টাকা (২-৪ দিন)।',
@@ -323,7 +324,7 @@ export default function Home() {
         if (!loadedSections || !Array.isArray(loadedSections)) {
             loadedSections = [];
             Object.keys(safeCatBanners).forEach(key => {
-                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT', 'CATEGORY_ORDER'].includes(key)) {
+                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT', 'CATEGORY_ORDER', 'FREE_DELIVERY_THRESHOLD'].includes(key)) {
                     loadedSections.push({ id: Date.now().toString() + Math.random(), title: key, fontSize: 36, imageUrl: safeCatBanners[key], color: '#B8860B', imageHeight: 300 });
                 }
             });
@@ -338,6 +339,7 @@ export default function Home() {
           fb_page_url: safeCatBanners['FB_PAGE_URL'] || 'https://m.me/61581595917703',
           default_sort: safeCatBanners['DEFAULT_SORT'] || 'lowToHigh',
           category_order: safeCatBanners['CATEGORY_ORDER'] || '',
+          free_delivery_threshold: safeCatBanners['FREE_DELIVERY_THRESHOLD'] !== undefined ? Number(safeCatBanners['FREE_DELIVERY_THRESHOLD']) : 1400,
           banners: safeBanners, 
           category_banners: safeCatBanners,
           contact_info: safeCatBanners['TXT_CONTACT'] || prev.contact_info,
@@ -415,12 +417,18 @@ export default function Home() {
     if (o > c && o > 0) return Math.round(((o - c) / o) * 100); return 0;
   };
 
+  const triggerCartAnimation = () => {
+     setAnimateCart(true);
+     setTimeout(() => setAnimateCart(false), 300);
+  };
+
   const addToCart = (product: Product, qty: number = 1) => {
     if(!product.in_stock) return showToast("দুঃখিত, এই প্রোডাক্টটি বর্তমানে স্টকে নেই!", "error");
     const existing = cart.find(item => item.id === product.id);
     if (existing) setCart(cart.map(item => item.id === product.id ? { ...item, quantity: item.quantity + qty } : item));
     else setCart([...cart, { ...product, quantity: qty }]);
     showToast("প্রোডাক্টটি ব্যাগে যোগ করা হয়েছে!", "success");
+    triggerCartAnimation();
   };
 
   const toggleWishlist = (product: Product, e: React.MouseEvent) => {
@@ -446,7 +454,9 @@ export default function Home() {
   const removeFromWishlist = (id: string) => { setWishlist(wishlist.filter((item) => item.id !== id)); showToast("রিমুভ করা হয়েছে", "success"); };
 
   const itemsSubtotal = cart.reduce((total, item) => total + (getNumericPrice(item.price) * item.quantity), 0);
-  const cartTotal = itemsSubtotal + shippingFee;
+  const isFreeDelivery = storeSettings.free_delivery_threshold > 0 && itemsSubtotal >= storeSettings.free_delivery_threshold;
+  const actualShippingFee = isFreeDelivery ? 0 : (shippingLocation === 'inside' ? 60 : 120);
+  const cartTotal = itemsSubtotal + actualShippingFee;
   const totalItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
@@ -461,7 +471,7 @@ export default function Home() {
       const orderData: any = { 
         customer_name: customerName, customer_phone: customerPhone, 
         customer_address: customerAddress + ` [Shipping: ${shippingLocation === 'inside' ? 'Inside Dhaka' : 'Outside Dhaka'}]`, 
-        total_amount: cartTotal, payment_method: payMethodType, items: cart, status: 'PENDING', shipping_charge: shippingFee 
+        total_amount: cartTotal, payment_method: payMethodType, items: cart, status: 'PENDING', shipping_charge: actualShippingFee 
       };
       if (user && user.id) orderData.user_id = user.id;
 
@@ -617,7 +627,8 @@ export default function Home() {
          'PAGE_TEXT_COLOR': storeSettings.page_text_color,
          'FB_PAGE_URL': storeSettings.fb_page_url,
          'DEFAULT_SORT': storeSettings.default_sort,
-         'CATEGORY_ORDER': storeSettings.category_order
+         'CATEGORY_ORDER': storeSettings.category_order,
+         'FREE_DELIVERY_THRESHOLD': storeSettings.free_delivery_threshold
       };
       const { error } = await supabase.from('store_settings').update({ shop_name: storeSettings.shop_name, phone: storeSettings.phone, category_banners: newCatBanners }).eq('id', 1);
       if(error) throw error; 
@@ -766,7 +777,7 @@ export default function Home() {
           </div>
         )}
 
-        <div className="w-full bg-[#FAF5EB] relative overflow-hidden flex items-center justify-center border-b border-[#EADFC8]" style={{ height: '240px' }}>
+        <div className="w-full bg-[#FAF5EB] relative overflow-hidden flex items-center justify-center border-b border-[#EADFC8] h-[240px]">
              {item.image_url ? (
                <img src={item.image_url} className="w-full h-full object-cover absolute inset-0 group-hover:scale-105 transition-transform duration-700 ease-in-out" />
              ) : (
@@ -819,8 +830,17 @@ export default function Home() {
              0%, 100% { transform: translate(-50%, 0); }
              50% { transform: translate(-50%, -10px); }
           }
+          @keyframes shimmer {
+             0% { background-position: -1000px 0; }
+             100% { background-position: 1000px 0; }
+          }
           .animate-slide-up { animation: slideUp 0.5s ease-out forwards; }
           .animate-bounce-short { animation: bounceShort 2s ease-in-out infinite; }
+          .skeleton-shimmer {
+             animation: shimmer 2.5s infinite linear;
+             background: linear-gradient(to right, #FAF5EB 4%, #F2E9D8 25%, #FAF5EB 36%);
+             background-size: 1000px 100%;
+          }
         `}} />
 
         <div className="relative z-10 min-h-screen pb-16 transition-colors duration-300"
@@ -866,7 +886,7 @@ export default function Home() {
               <button onClick={() => setIsWishlistOpen(true)} className="relative text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">
                 ❤️{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
               </button>
-              <button onClick={() => setIsCartOpen(true)} className="relative text-2xl text-[#111412] hover:text-[#D4AF37] transition-colors">
+              <button onClick={() => setIsCartOpen(true)} className={`relative text-2xl text-[#111412] hover:text-[#D4AF37] transition-all duration-300 ${animateCart ? 'scale-125 text-[#B8860B]' : ''}`}>
                 🛒{cart.length > 0 && <span className="absolute -top-1 -right-3 bg-[#111412] text-[#D4AF37] text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-[#D4AF37]">{totalItemsCount}</span>}
               </button>
             </div>
@@ -908,9 +928,19 @@ export default function Home() {
 
             <div id="products-section" className="w-full mt-2 flex flex-col gap-20">
                {loading ? (
-                 <div className="text-center py-20 text-[#D4AF37] text-lg font-bold tracking-[0.2em] uppercase animate-pulse">Loading Premium Collection...</div>
+                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
+                     {[...Array(12)].map((_, i) => (
+                         <div key={i} className="bg-white border border-[#EADFC8] rounded-md h-[380px] flex flex-col p-4 shadow-sm overflow-hidden">
+                             <div className="skeleton-shimmer h-48 w-full rounded-sm mb-4"></div>
+                             <div className="skeleton-shimmer h-3 w-1/3 mx-auto mb-2 rounded-sm"></div>
+                             <div className="skeleton-shimmer h-4 w-3/4 mx-auto mb-4 rounded-sm"></div>
+                             <div className="skeleton-shimmer h-6 w-1/2 mx-auto mt-auto mb-4 rounded-sm"></div>
+                             <div className="skeleton-shimmer h-8 w-full rounded-sm mb-2"></div>
+                             <div className="skeleton-shimmer h-8 w-full rounded-sm"></div>
+                         </div>
+                     ))}
+                 </div>
                ) : (() => {
-                 // UNIFIED CATEGORY SORTING LOGIC
                  const adminOrder = storeSettings.category_order ? storeSettings.category_order.split(',').map(s => s.trim()).filter(Boolean) : [];
                  const allCategoriesToRender = Array.from(new Set([
                    ...customSections.map(c => c.title),
@@ -992,7 +1022,6 @@ export default function Home() {
 
         </div> 
 
-        {/* Facebook Messenger Floating Button */}
         {storeSettings.fb_page_url && (
            <a href={storeSettings.fb_page_url} target="_blank" rel="noopener noreferrer" className="fixed bottom-24 md:bottom-20 right-6 z-[250] bg-[#1877F2] text-white p-3.5 rounded-full shadow-2xl hover:bg-[#166FE5] transition-transform hover:scale-110 border-2 border-white hidden md:flex">
               <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 0C5.373 0 0 5.068 0 11.321c0 3.565 1.763 6.744 4.538 8.87v3.809l4.168-2.292c1.05.292 2.158.448 3.294.448 6.627 0 12-5.068 12-11.321S18.627 0 12 0zm1.206 15.352l-3.08-3.295-6.002 3.295 6.623-7.039 3.167 3.295 5.915-3.295-6.623 7.039z"/></svg>
@@ -1009,7 +1038,7 @@ export default function Home() {
               <span className="text-xl leading-none">☰</span> 
               <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Menu</span> 
            </button>
-           <button onClick={() => setIsCartOpen(true)} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors relative"> 
+           <button onClick={() => setIsCartOpen(true)} className={`flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors relative ${animateCart ? 'scale-110 text-[#B8860B]' : ''}`}> 
               <span className="text-xl leading-none">🛒</span> 
               {cart.length > 0 && <span className="absolute top-2 right-4 bg-[#D4AF37] text-[#111412] border border-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">{totalItemsCount}</span>} 
               <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Bag</span> 
@@ -1139,7 +1168,7 @@ export default function Home() {
           const viewingDiscount = viewingProduct.original_price ? calculateDiscount(viewingProduct.original_price, viewingProduct.price) : 0;
           return (
           <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto z-[1000]" onClick={() => setViewingProduct(null)}>
-            <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden pb-16 md:pb-0" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-4 md:px-8 md:py-5 shadow-sm sticky top-0 z-30">
                  <button onClick={() => setViewingProduct(null)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white px-5 py-2.5 rounded-sm shadow-sm">
                     <span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান
@@ -1156,11 +1185,11 @@ export default function Home() {
 
                 <div className="flex flex-col md:flex-row gap-10 relative">
                   
-                  {/* LEFT COLUMN: Vertically stacked full images */}
+                  {/* LEFT COLUMN: Zoomable full images */}
                   <div className="w-full md:w-1/2 flex flex-col gap-6">
                     {[viewingProduct.image_url, viewingProduct.image_url_2, viewingProduct.image_url_3, viewingProduct.image_url_4].filter(Boolean).map((img, idx) => (
-                      <div key={idx} className="w-full bg-white rounded-sm border border-[#EADFC8] flex items-center justify-center p-2 overflow-hidden shadow-sm">
-                         <img src={img as string} className="w-full h-auto object-contain" />
+                      <div key={idx} className="w-full bg-white rounded-sm border border-[#EADFC8] flex items-center justify-center p-2 overflow-hidden shadow-sm relative group cursor-zoom-in">
+                         <img src={img as string} className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.5] origin-center" />
                       </div>
                     ))}
                   </div>
@@ -1183,11 +1212,24 @@ export default function Home() {
                         {viewingProduct.in_stock !== false && <p className="flex items-center gap-2 text-green-600"><span className="text-base">✅</span> স্টকে আছে</p>}
                      </div>
 
-                     <div className="bg-red-50 text-red-500 font-black italic px-4 py-2.5 rounded-sm inline-flex items-center gap-3 w-max mb-8 border border-red-200 shadow-sm">
-                        <span className="text-2xl leading-none">🚚</span> FREE DELIVERY
-                     </div>
+                     {/* Dynamic Gamified Free Delivery Badge */}
+                     {storeSettings.free_delivery_threshold > 0 && (
+                        <div className="bg-[#FAF5EB] border border-[#D4AF37]/50 px-4 py-3 rounded-sm flex items-center gap-3 w-full mb-8 shadow-sm">
+                           <span className="text-2xl leading-none">🚚</span>
+                           {getNumericPrice(viewingProduct.price) >= storeSettings.free_delivery_threshold ? (
+                               <p className="text-green-600 font-bold text-[11px] uppercase tracking-widest">এই প্রোডাক্টটিতে ফ্রি ডেলিভারি!</p>
+                           ) : (
+                               <div className="flex-1">
+                                   <p className="text-[#B8860B] font-bold text-[10px] mb-1">আর মাত্র ৳{storeSettings.free_delivery_threshold - getNumericPrice(viewingProduct.price)} টাকার শপিংয়ে ফ্রি ডেলিভারি!</p>
+                                   <div className="w-full bg-white border border-[#EADFC8] rounded-full h-1 overflow-hidden">
+                                       <div className="bg-[#D4AF37] h-1 rounded-full" style={{ width: `${(getNumericPrice(viewingProduct.price) / storeSettings.free_delivery_threshold) * 100}%` }}></div>
+                                   </div>
+                               </div>
+                           )}
+                        </div>
+                     )}
 
-                     <div className="flex flex-col gap-3.5 mb-10">
+                     <div className="flex flex-col gap-3.5 mb-10 hidden md:flex">
                          <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={!viewingProduct.in_stock} className="w-full bg-[#111412] text-white font-bold py-4 rounded-sm hover:bg-[#333] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-md">
                            ⚡ সরাসরি অর্ডার করুন
                          </button>
@@ -1195,7 +1237,6 @@ export default function Home() {
                            🛒 ব্যাগে যোগ করুন
                          </button>
                          
-                         {/* WhatsApp Order Feature */}
                          <a href={`https://wa.me/88${storeSettings.phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম, আমি এই প্রোডাক্টটি নিতে চাই:\n\nনাম: ${viewingProduct.name}\nদাম: ৳${viewingProduct.price}\nআইডি: ${viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm uppercase">
                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z"/></svg>
                            হোয়াটসঅ্যাপে অর্ডার
@@ -1214,7 +1255,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="border-t border-[#EADFC8] pt-12 mt-16">
+                <div className="border-t border-[#EADFC8] pt-12 mt-16 pb-6">
                    <h3 className="text-2xl font-bold mb-10 border-l-4 border-[#D4AF37] pl-5 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>কাস্টমার রিভিউ ({productReviews.length})</h3>
                    
                    <div className="flex flex-col md:flex-row gap-10">
@@ -1244,6 +1285,12 @@ export default function Home() {
                      </div>
                    </div>
                 </div>
+              </div>
+              
+              {/* Sticky Bottom Bar for Mobile Only within Modal */}
+              <div className="md:hidden absolute bottom-0 left-0 w-full bg-white border-t border-[#EADFC8] p-3 shadow-[0_-5px_15px_rgba(0,0,0,0.1)] flex gap-3 z-50 animate-slide-up">
+                 <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); }} disabled={!viewingProduct.in_stock} className="flex-1 bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[11px] font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 uppercase tracking-widest shadow-sm">🛒 ব্যাগে যোগ</button>
+                 <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={!viewingProduct.in_stock} className="flex-1 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[11px] font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 uppercase tracking-widest shadow-md">⚡ অর্ডার করুন</button>
               </div>
             </div>
           </div>
@@ -1294,11 +1341,11 @@ export default function Home() {
                     <div className="flex flex-col gap-3 bg-[#FAF5EB] p-5 rounded-sm border border-[#EADFC8] shadow-sm">
                        <label className="flex items-center gap-3 text-sm text-[#111412] font-bold cursor-pointer">
                           <input type="radio" name="shipping" checked={shippingLocation==='inside'} onChange={()=>setShippingLocation('inside')} className="accent-[#D4AF37] w-4 h-4 cursor-pointer" />
-                          <span>ঢাকার ভিতরে (৳ ৬০)</span>
+                          <span>ঢাকার ভিতরে {isFreeDelivery ? <><del className="text-gray-400">৳ ৬০</del> <span className="text-green-600 bg-green-100 px-2 rounded-sm ml-1 text-xs">FREE</span></> : '(৳ ৬০)'}</span>
                        </label>
                        <label className="flex items-center gap-3 text-sm text-[#111412] font-bold cursor-pointer">
                           <input type="radio" name="shipping" checked={shippingLocation==='outside'} onChange={()=>setShippingLocation('outside')} className="accent-[#D4AF37] w-4 h-4 cursor-pointer" />
-                          <span>ঢাকার বাইরে (৳ ১২০)</span>
+                          <span>ঢাকার বাইরে {isFreeDelivery ? <><del className="text-gray-400">৳ ১২০</del> <span className="text-green-600 bg-green-100 px-2 rounded-sm ml-1 text-xs">FREE</span></> : '(৳ ১২০)'}</span>
                        </label>
                     </div>
                   </div>
@@ -1347,9 +1394,25 @@ export default function Home() {
           <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-sm flex justify-end z-[1000]" onClick={() => setIsCartOpen(false)}>
             <div className="bg-white w-full max-w-sm h-full p-8 relative flex flex-col shadow-2xl border-l-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
               <button onClick={() => setIsCartOpen(false)} className="absolute top-6 right-6 text-3xl text-gray-400 hover:text-[#111412] transition-colors leading-none">✕</button>
-              <h3 className="text-xl font-bold mb-8 border-b border-[#EADFC8] pb-5 text-[#B8860B] tracking-[0.2em] uppercase">শপিং ব্যাগ</h3>
+              <h3 className="text-xl font-bold mb-6 border-b border-[#EADFC8] pb-5 text-[#B8860B] tracking-[0.2em] uppercase">শপিং ব্যাগ</h3>
               
-              <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+              {/* CART GAMIFICATION BAR */}
+              {storeSettings.free_delivery_threshold > 0 && cart.length > 0 && (
+                <div className="mb-4 bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm">
+                   {isFreeDelivery ? (
+                       <p className="text-green-600 font-bold text-[11px] flex items-center gap-2 uppercase tracking-widest"><span className="text-base">🎉</span> অভিনন্দন! ফ্রি ডেলিভারি আনলক হয়েছে!</p>
+                   ) : (
+                       <>
+                           <p className="text-[#B8860B] font-bold text-[10px] mb-2 uppercase tracking-widest">আর মাত্র ৳{storeSettings.free_delivery_threshold - itemsSubtotal} শপিং করলেই ফ্রি ডেলিভারি!</p>
+                           <div className="w-full bg-white border border-[#EADFC8] rounded-full h-1.5 mb-1 overflow-hidden shadow-inner">
+                               <div className="bg-[#D4AF37] h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min((itemsSubtotal / storeSettings.free_delivery_threshold) * 100, 100)}%` }}></div>
+                           </div>
+                       </>
+                   )}
+                </div>
+              )}
+
+              <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 mt-2">
                 {cart.map(item => (
                   <div key={item.id} className="flex items-center justify-between bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
                     <div className="flex gap-4 items-center w-2/3">
@@ -1630,7 +1693,6 @@ export default function Home() {
                            </div>
                       </div>
 
-                      {/* NEW FEATURE: Admin Controlled Global Category Order */}
                       <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm mb-8 mt-6">
                          <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Global Category Order (ক্যাটাগরি সাজানোর ক্রম)</label>
                          <div className="flex flex-col md:flex-row items-center gap-6">
@@ -1641,6 +1703,25 @@ export default function Home() {
                            <div className="flex-1 border border-[#D4AF37]/50 bg-[#FAF5EB] p-4 rounded-sm">
                               <p className="text-[10px] font-bold text-[#B8860B] uppercase tracking-widest leading-relaxed">
                                  💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবে না, সেগুলো অটোমেটিক নিচে চলে যাবে।
+                              </p>
+                           </div>
+                         </div>
+                      </div>
+
+                      {/* NEW: Admin Controllable Gamified Free Delivery */}
+                      <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm mb-8 mt-6">
+                         <label className="text-[10px] font-bold mb-4 block text-[#25D366] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Gamified Free Delivery Offer (ফ্রি ডেলিভারি টার্গেট)</label>
+                         <div className="flex flex-col md:flex-row items-center gap-6">
+                           <div className="flex-1 w-full">
+                              <p className="text-xs text-gray-600 font-bold mb-3 tracking-widest">কতো টাকার অর্ডার করলে কাস্টমার ফ্রি ডেলিভারি পাবে?</p>
+                              <div className="relative">
+                                 <span className="absolute left-4 top-1/2 transform -translate-y-1/2 font-bold text-gray-500">৳</span>
+                                 <input type="number" value={storeSettings.free_delivery_threshold} onChange={e=>setStoreSettings({...storeSettings, free_delivery_threshold: Number(e.target.value)})} placeholder="e.g. 1400" className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] py-4 pl-10 pr-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors font-black text-lg"/>
+                              </div>
+                           </div>
+                           <div className="flex-1 border border-[#25D366]/50 bg-[#25D366]/10 p-4 rounded-sm">
+                              <p className="text-[10px] font-bold text-gray-700 uppercase tracking-widest leading-relaxed">
+                                 💡 এখানে আপনি যে অ্যামাউন্ট সেট করবেন, কাস্টমার ব্যাগে প্রোডাক্ট রাখলে অটোমেটিক একটি "প্রোগ্রেস বার" দেখাবে। টার্গেট ফিলআপ হলে স্বয়ংক্রিয়ভাবে ডেলিভারি চার্জ ০ হয়ে যাবে! (অফারটি বন্ধ রাখতে 0 দিয়ে রাখুন)।
                               </p>
                            </div>
                          </div>
