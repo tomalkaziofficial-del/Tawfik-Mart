@@ -182,7 +182,8 @@ export default function Home() {
     heading_color: '#B8860B',
     page_text_color: '#374151',
     fb_page_url: 'https://m.me/61581595917703',
-    default_sort: 'lowToHigh', // Admin Controlled Sort
+    default_sort: 'lowToHigh', 
+    category_order: '', // NEW: To handle category display order
     contact_info: 'অফিস: ঢাকা\nফোন: 01632331534\nইমেইল: support@zeenat.com',
     return_policy: 'পণ্য হাতে পাওয়ার পর যদি কোনো ত্রুটি থাকে, তবে ২৪ ঘণ্টার মধ্যে আমাদের সাথে যোগাযোগ করুন।',
     delivery_policy: 'ঢাকার ভেতরে ডেলিভারি চার্জ ৬০ টাকা (১-২ দিন)।\nঢাকার বাইরে ডেলিভারি চার্জ ১২০ টাকা (২-৪ দিন)।',
@@ -322,7 +323,7 @@ export default function Home() {
         if (!loadedSections || !Array.isArray(loadedSections)) {
             loadedSections = [];
             Object.keys(safeCatBanners).forEach(key => {
-                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT'].includes(key)) {
+                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT', 'CATEGORY_ORDER'].includes(key)) {
                     loadedSections.push({ id: Date.now().toString() + Math.random(), title: key, fontSize: 36, imageUrl: safeCatBanners[key], color: '#B8860B', imageHeight: 300 });
                 }
             });
@@ -336,6 +337,7 @@ export default function Home() {
           phone: data.phone || '01632331534', 
           fb_page_url: safeCatBanners['FB_PAGE_URL'] || 'https://m.me/61581595917703',
           default_sort: safeCatBanners['DEFAULT_SORT'] || 'lowToHigh',
+          category_order: safeCatBanners['CATEGORY_ORDER'] || '',
           banners: safeBanners, 
           category_banners: safeCatBanners,
           contact_info: safeCatBanners['TXT_CONTACT'] || prev.contact_info,
@@ -614,7 +616,8 @@ export default function Home() {
          'HEADING_COLOR': storeSettings.heading_color,
          'PAGE_TEXT_COLOR': storeSettings.page_text_color,
          'FB_PAGE_URL': storeSettings.fb_page_url,
-         'DEFAULT_SORT': storeSettings.default_sort
+         'DEFAULT_SORT': storeSettings.default_sort,
+         'CATEGORY_ORDER': storeSettings.category_order
       };
       const { error } = await supabase.from('store_settings').update({ shop_name: storeSettings.shop_name, phone: storeSettings.phone, category_banners: newCatBanners }).eq('id', 1);
       if(error) throw error; 
@@ -722,7 +725,6 @@ export default function Home() {
     (item.id || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Admin Controlled Smart Sorting Logic
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     const priceA = getNumericPrice(a.price);
     const priceB = getNumericPrice(b.price);
@@ -739,7 +741,6 @@ export default function Home() {
   
   const bgImage = storeSettings.category_banners?.['WEBSITE_BG'];
   const isBgVisible = storeSettings.bg_enabled && bgImage;
-  const renderedCategories = new Set<string>();
 
   const renderProductCard = (item: Product, isAdminView: boolean = false) => {
     const discount = item.original_price ? calculateDiscount(item.original_price, item.price) : 0;
@@ -895,7 +896,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Back Button Container (Sorting is now handled from Admin Panel) */}
             <div className="w-full flex justify-between items-center mb-2 mt-4 bg-white p-3 rounded-sm border border-[#EADFC8] shadow-sm">
                {activeCategory !== 'All' ? (
                   <button onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}} className="flex items-center gap-2 bg-[#111412] text-[#D4AF37] px-4 md:px-6 py-2 md:py-2.5 rounded-sm shadow-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs border border-[#D4AF37]">
@@ -909,87 +909,65 @@ export default function Home() {
             <div id="products-section" className="w-full mt-2 flex flex-col gap-20">
                {loading ? (
                  <div className="text-center py-20 text-[#D4AF37] text-lg font-bold tracking-[0.2em] uppercase animate-pulse">Loading Premium Collection...</div>
-               ) : (
-                 <>
-                   {customSections.map(section => {
-                      renderedCategories.add(section.title);
-                      
-                      if (activeCategory === 'All' && specialCategories.includes(section.title)) return null;
-                      if (activeCategory !== 'All' && activeCategory !== section.title) return null;
-                      
-                      const catProducts = sortedProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(section.title));
-                      if (catProducts.length === 0 && !section.imageUrl) return null;
+               ) : (() => {
+                 // UNIFIED CATEGORY SORTING LOGIC
+                 const adminOrder = storeSettings.category_order ? storeSettings.category_order.split(',').map(s => s.trim()).filter(Boolean) : [];
+                 const allCategoriesToRender = Array.from(new Set([
+                   ...customSections.map(c => c.title),
+                   ...allDynamicCats
+                 ]));
 
-                      const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
-                      const currentSub = activeSubCategories[section.title] || 'All';
-                      const finalProducts = currentSub === 'All' ? catProducts : catProducts.filter(item => item.tag === currentSub);
+                 const sortedCategoriesToRender = [...allCategoriesToRender].sort((a, b) => {
+                    const indexA = adminOrder.indexOf(a);
+                    const indexB = adminOrder.indexOf(b);
+                    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                    if (indexA !== -1) return -1;
+                    if (indexB !== -1) return 1;
+                    return 0;
+                 });
 
-                      return (
-                        <div key={section.id} className="w-full">
-                          <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
-                             <h2 className="font-bold tracking-wide" style={{ fontSize: `${section.fontSize || 32}px`, color: section.color || storeSettings.heading_color || '#B8860B' }}>{section.title}</h2>
-                             <button onClick={() => {setActiveCategory(section.title); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
-                          </div>
+                 return sortedCategoriesToRender.map(catTitle => {
+                    if (activeCategory === 'All' && specialCategories.includes(catTitle)) return null;
+                    if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
 
-                          {subCats.length > 0 && (
-                              <div className="flex gap-3 overflow-x-auto custom-scrollbar mb-8 pb-2">
-                                  <button onClick={() => handleSubCategoryClick(section.title, 'All')} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === 'All' ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>সব</button>
-                                  {subCats.map(sub => (
-                                      <button key={sub} onClick={() => handleSubCategoryClick(section.title, sub)} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === sub ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>{sub}</button>
-                                  ))}
-                              </div>
-                          )}
-                          
-                          {section.imageUrl && activeCategory === 'All' && (
-                            <div className="w-full mb-10 shadow-md rounded-sm overflow-hidden border border-[#EADFC8] relative bg-[#FAF5EB]" style={{ height: section.imageHeight ? `${section.imageHeight}px` : '300px' }}>
-                              <img src={section.imageUrl} alt={section.title} className="w-full h-full absolute inset-0" style={{ objectFit: 'fill', width: '100%', height: '100%' }} />
+                    const section = customSections.find(s => s.title === catTitle);
+                    const catProducts = sortedProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(catTitle));
+
+                    if (catProducts.length === 0 && (!section || !section.imageUrl)) return null;
+
+                    const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
+                    const currentSub = activeSubCategories[catTitle] || 'All';
+                    const finalProducts = currentSub === 'All' ? catProducts : catProducts.filter(item => item.tag === currentSub);
+
+                    return (
+                      <div key={catTitle} className="w-full">
+                        <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
+                           <h2 className="font-bold tracking-wide" style={{ fontSize: section?.fontSize ? `${section.fontSize}px` : '30px', color: section?.color || storeSettings.heading_color || '#B8860B' }}>{catTitle}</h2>
+                           <button onClick={() => {setActiveCategory(catTitle); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
+                        </div>
+
+                        {subCats.length > 0 && (
+                            <div className="flex gap-3 overflow-x-auto custom-scrollbar mb-8 pb-2">
+                                <button onClick={() => handleSubCategoryClick(catTitle, 'All')} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === 'All' ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>সব</button>
+                                {subCats.map(sub => (
+                                    <button key={sub} onClick={() => handleSubCategoryClick(catTitle, sub)} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === sub ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>{sub}</button>
+                                ))}
                             </div>
-                          )}
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
-                              {finalProducts.length > 0 ? finalProducts.map(item => renderProductCard(item)) : <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found in this sub-category</p>}
+                        )}
+                        
+                        {section && section.imageUrl && activeCategory === 'All' && (
+                          <div className="w-full mb-10 shadow-md rounded-sm overflow-hidden border border-[#EADFC8] relative bg-[#FAF5EB]" style={{ height: section.imageHeight ? `${section.imageHeight}px` : '300px' }}>
+                            <img src={section.imageUrl} alt={section.title} className="w-full h-full absolute inset-0" style={{ objectFit: 'fill', width: '100%', height: '100%' }} />
                           </div>
-                        </div>
-                      );
-                   })}
+                        )}
 
-                   {dynamicSidebarCategories.map(catTitle => {
-                      if (renderedCategories.has(catTitle)) return null;
-                      
-                      if (activeCategory === 'All' && specialCategories.includes(catTitle)) return null;
-                      if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
-                      
-                      const catProducts = sortedProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(catTitle));
-                      if (catProducts.length === 0) return null;
-
-                      const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
-                      const currentSub = activeSubCategories[catTitle] || 'All';
-                      const finalProducts = currentSub === 'All' ? catProducts : catProducts.filter(item => item.tag === currentSub);
-
-                      return (
-                        <div key={catTitle} className="w-full">
-                          <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
-                             <h2 className="text-2xl md:text-3xl font-bold tracking-wide" style={{ color: storeSettings.heading_color || '#B8860B' }}>{catTitle}</h2>
-                             <button onClick={() => {setActiveCategory(catTitle); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
-                          </div>
-
-                          {subCats.length > 0 && (
-                              <div className="flex gap-3 overflow-x-auto custom-scrollbar mb-8 pb-2">
-                                  <button onClick={() => handleSubCategoryClick(catTitle, 'All')} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === 'All' ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>সব</button>
-                                  {subCats.map(sub => (
-                                      <button key={sub} onClick={() => handleSubCategoryClick(catTitle, sub)} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === sub ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>{sub}</button>
-                                  ))}
-                              </div>
-                          )}
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
                             {finalProducts.length > 0 ? finalProducts.map(item => renderProductCard(item)) : <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found in this sub-category</p>}
-                          </div>
                         </div>
-                      );
-                   })}
-                 </>
-               )}
+                      </div>
+                    );
+                 });
+               })()}
             </div>
           </section>
 
@@ -1633,7 +1611,6 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* NEW FEATURE: Admin Controlled Global Product Sort */}
                       <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm mb-8">
                            <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Global Product Sorting</label>
                            <div className="flex flex-col md:flex-row items-center gap-6">
@@ -1651,6 +1628,22 @@ export default function Home() {
                                 </p>
                              </div>
                            </div>
+                      </div>
+
+                      {/* NEW FEATURE: Admin Controlled Global Category Order */}
+                      <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm mb-8 mt-6">
+                         <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Global Category Order (ক্যাটাগরি সাজানোর ক্রম)</label>
+                         <div className="flex flex-col md:flex-row items-center gap-6">
+                           <div className="flex-1 w-full">
+                              <p className="text-xs text-gray-600 font-bold mb-3 tracking-widest">যে ক্যাটাগরিগুলো উপরে দেখাতে চান, সেগুলোর নাম কমা (,) দিয়ে লিখুন:</p>
+                              <input type="text" value={storeSettings.category_order} onChange={e=>setStoreSettings({...storeSettings, category_order: e.target.value})} placeholder="e.g. জিলবাব, আবায়া, খিমার" className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors font-bold"/>
+                           </div>
+                           <div className="flex-1 border border-[#D4AF37]/50 bg-[#FAF5EB] p-4 rounded-sm">
+                              <p className="text-[10px] font-bold text-[#B8860B] uppercase tracking-widest leading-relaxed">
+                                 💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবে না, সেগুলো অটোমেটিক নিচে চলে যাবে।
+                              </p>
+                           </div>
+                         </div>
                       </div>
 
                       <div className="mb-8 bg-white p-8 border border-[#EADFC8] rounded-sm shadow-sm">
