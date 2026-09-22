@@ -159,6 +159,12 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
 
+  // BULK UPDATE STATES
+  const [bulkCategory, setBulkCategory] = useState('');
+  const [bulkOriginalPrice, setBulkOriginalPrice] = useState('');
+  const [bulkOfferPrice, setBulkOfferPrice] = useState('');
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
   const [customSections, setCustomSections] = useState<{id: string, title: string, fontSize: number, imageUrl: string, color?: string, imageHeight?: number}[]>([]);
 
   const [storeSettings, setStoreSettings] = useState({
@@ -583,6 +589,49 @@ export default function Home() {
       if(error) throw error; 
       alert("সেটিংস সফলভাবে সেভ হয়েছে!"); fetchSettings();
     } catch (error: any) { alert("সেটিংস সেভ করতে সমস্যা হয়েছে:\n" + (error.message || JSON.stringify(error))); }
+  };
+
+  // BULK PRICE UPDATE HANDLER
+  const handleBulkPriceUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkCategory || !bulkOfferPrice) {
+      alert("ক্যাটাগরি এবং অফার প্রাইস অবশ্যই দিতে হবে!");
+      return;
+    }
+    if (!window.confirm(`সত্যিই কি "${bulkCategory}" ক্যাটাগরির সকল প্রোডাক্টের দাম পরিবর্তন করতে চান?`)) return;
+
+    setIsBulkUpdating(true);
+    try {
+      const productsToUpdate = products.filter(p => (p.category || '').split(',').map(c=>c.trim()).includes(bulkCategory));
+      
+      if (productsToUpdate.length === 0) {
+        alert("এই ক্যাটাগরিতে কোনো প্রোডাক্ট পাওয়া যায়নি!");
+        setIsBulkUpdating(false);
+        return;
+      }
+
+      const productIds = productsToUpdate.map(p => p.id);
+      
+      const { error } = await supabase
+        .from('products')
+        .update({
+          original_price: bulkOriginalPrice || null,
+          price: bulkOfferPrice
+        })
+        .in('id', productIds);
+
+      if (error) throw error;
+      
+      alert(`সফলভাবে ${productsToUpdate.length} টি প্রোডাক্টের দাম আপডেট হয়েছে!`);
+      setBulkOriginalPrice('');
+      setBulkOfferPrice('');
+      setBulkCategory('');
+      fetchProducts();
+    } catch (error: any) {
+      alert("আপডেট করতে সমস্যা হয়েছে: " + error.message);
+    } finally {
+      setIsBulkUpdating(false);
+    }
   };
 
   const handleCategoryToggle = (cat: string) => {
@@ -1638,6 +1687,34 @@ export default function Home() {
 
                 {adminTab === 'products' && (
                   <div>
+                    {/* BULK CATEGORY PRICE UPDATE SECTION */}
+                    <div className="mb-8 bg-[#FAF5EB] p-6 border border-[#EADFC8] rounded-sm shadow-sm">
+                      <h3 className="font-bold text-sm text-[#111412] tracking-[0.2em] uppercase mb-5 border-b border-[#D4AF37]/30 pb-3">Bulk Category Price & Offer Update</h3>
+                      <form onSubmit={handleBulkPriceUpdate} className="flex flex-col md:flex-row gap-4 items-end">
+                        <div className="flex-1 w-full">
+                          <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Select Category <span className="text-red-500">*</span></label>
+                          <select value={bulkCategory} onChange={e => setBulkCategory(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner">
+                            <option value="">-- ক্যাটাগরি নির্বাচন করুন --</option>
+                            {allCategoryOptions.map((cat, idx) => (
+                              <option key={idx} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1 w-full">
+                          <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Main Price (কাটা দাম)</label>
+                          <input type="text" placeholder="e.g. 1500" value={bulkOriginalPrice} onChange={e => setBulkOriginalPrice(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner"/>
+                        </div>
+                        <div className="flex-1 w-full">
+                          <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Offer Price (বর্তমান দাম) <span className="text-red-500">*</span></label>
+                          <input type="text" required placeholder="e.g. 999" value={bulkOfferPrice} onChange={e => setBulkOfferPrice(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner"/>
+                        </div>
+                        <button type="submit" disabled={isBulkUpdating} className="w-full md:w-auto bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-8 py-3.5 text-[11px] font-bold rounded-sm shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors tracking-[0.2em] uppercase whitespace-nowrap">
+                          {isBulkUpdating ? 'Updating...' : 'Apply to All'}
+                        </button>
+                      </form>
+                      <p className="text-[10px] text-gray-500 font-bold tracking-[0.1em] mt-4 uppercase">⚠️ এটি সেভ করলে নির্বাচিত ক্যাটাগরির সকল প্রোডাক্টের দাম একযোগে পরিবর্তন হয়ে যাবে এবং অটোমেটিক ডিসকাউন্ট ব্যাজ তৈরি হবে।</p>
+                    </div>
+
                     <div className="mb-6 flex justify-between items-center bg-[#FAF5EB] p-4 border border-[#EADFC8] rounded-sm shadow-sm">
                       <h3 className="font-bold text-sm text-[#111412] tracking-[0.2em] uppercase">All Products ({products.length})</h3>
                       <input 
