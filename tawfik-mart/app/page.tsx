@@ -159,13 +159,16 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
 
-  // BULK UPDATE STATES
   const [bulkCategory, setBulkCategory] = useState('');
   const [bulkOriginalPrice, setBulkOriginalPrice] = useState('');
   const [bulkOfferPrice, setBulkOfferPrice] = useState('');
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   const [customSections, setCustomSections] = useState<{id: string, title: string, fontSize: number, imageUrl: string, color?: string, imageHeight?: number}[]>([]);
+
+  const [toastMessage, setToastMessage] = useState<{msg: string, type: 'success'|'error'} | null>(null);
+  const [orderSuccess, setOrderSuccess] = useState<{show: boolean, orderId: string}>({show: false, orderId: ''});
+  const [fomoMsg, setFomoMsg] = useState<Product | null>(null);
 
   const [storeSettings, setStoreSettings] = useState({
     shop_name: 'Zeenat Mart', 
@@ -179,6 +182,7 @@ export default function Home() {
     heading_color: '#B8860B',
     page_text_color: '#374151',
     fb_page_url: 'https://m.me/61581595917703',
+    default_sort: 'lowToHigh', // Admin Controlled Sort
     contact_info: 'অফিস: ঢাকা\nফোন: 01632331534\nইমেইল: support@zeenat.com',
     return_policy: 'পণ্য হাতে পাওয়ার পর যদি কোনো ত্রুটি থাকে, তবে ২৪ ঘণ্টার মধ্যে আমাদের সাথে যোগাযোগ করুন।',
     delivery_policy: 'ঢাকার ভেতরে ডেলিভারি চার্জ ৬০ টাকা (১-২ দিন)।\nঢাকার বাইরে ডেলিভারি চার্জ ১২০ টাকা (২-৪ দিন)।',
@@ -195,11 +199,26 @@ export default function Home() {
 
   const isAdmin = user && user.email === ADMIN_EMAIL;
 
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage({msg, type});
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   useEffect(() => {
     if (showAuthModal) {
       setAuthView('LOGIN');
     }
   }, [showAuthModal]);
+
+  useEffect(() => {
+    if (products.length === 0) return;
+    const interval = setInterval(() => {
+       const randomProduct = products[Math.floor(Math.random() * products.length)];
+       setFomoMsg(randomProduct);
+       setTimeout(() => setFomoMsg(null), 6000); 
+    }, 28000); 
+    return () => clearInterval(interval);
+  }, [products]);
 
   useEffect(() => {
     fetchSettings(); 
@@ -303,7 +322,7 @@ export default function Home() {
         if (!loadedSections || !Array.isArray(loadedSections)) {
             loadedSections = [];
             Object.keys(safeCatBanners).forEach(key => {
-                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL'].includes(key)) {
+                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT'].includes(key)) {
                     loadedSections.push({ id: Date.now().toString() + Math.random(), title: key, fontSize: 36, imageUrl: safeCatBanners[key], color: '#B8860B', imageHeight: 300 });
                 }
             });
@@ -316,6 +335,7 @@ export default function Home() {
           shop_name: data.shop_name || 'Zeenat Mart', 
           phone: data.phone || '01632331534', 
           fb_page_url: safeCatBanners['FB_PAGE_URL'] || 'https://m.me/61581595917703',
+          default_sort: safeCatBanners['DEFAULT_SORT'] || 'lowToHigh',
           banners: safeBanners, 
           category_banners: safeCatBanners,
           contact_info: safeCatBanners['TXT_CONTACT'] || prev.contact_info,
@@ -394,34 +414,41 @@ export default function Home() {
   };
 
   const addToCart = (product: Product, qty: number = 1) => {
-    if(!product.in_stock) return alert("দুঃখিত, এই প্রোডাক্টটি বর্তমানে স্টকে নেই!");
+    if(!product.in_stock) return showToast("দুঃখিত, এই প্রোডাক্টটি বর্তমানে স্টকে নেই!", "error");
     const existing = cart.find(item => item.id === product.id);
     if (existing) setCart(cart.map(item => item.id === product.id ? { ...item, quantity: item.quantity + qty } : item));
     else setCart([...cart, { ...product, quantity: qty }]);
+    showToast("প্রোডাক্টটি ব্যাগে যোগ করা হয়েছে!", "success");
   };
 
   const toggleWishlist = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation(); const existing = wishlist.find(item => item.id === product.id);
-    if (existing) setWishlist(wishlist.filter(item => item.id !== product.id)); else setWishlist([...wishlist, product]);
+    if (existing) {
+       setWishlist(wishlist.filter(item => item.id !== product.id)); 
+       showToast("উইশলিস্ট থেকে সরানো হয়েছে!", "success");
+    } else {
+       setWishlist([...wishlist, product]);
+       showToast("উইশলিস্টে যোগ করা হয়েছে!", "success");
+    }
   };
 
   const handleDirectOrder = (product: Product, qty: number = 1, e?: React.MouseEvent) => {
-    if(e) e.stopPropagation(); if(!product.in_stock) return alert("দুঃখিত, এই প্রোডাক্টটি বর্তমানে স্টকে নেই!");
+    if(e) e.stopPropagation(); if(!product.in_stock) return showToast("দুঃখিত, এই প্রোডাক্টটি বর্তমানে স্টকে নেই!", "error");
     const existing = cart.find(item => item.id === product.id);
     if (!existing) setCart([...cart, { ...product, quantity: qty }]);
     setViewingProduct(null); setIsCartOpen(false); setIsCheckoutOpen(true); 
   };
 
   const updateQuantity = (id: string, delta: number) => { setCart(cart.map(item => { if (item.id === id) { const newQty = item.quantity + delta; return newQty > 0 ? { ...item, quantity: newQty } : item; } return item; })); };
-  const removeFromCart = (id: string) => setCart(cart.filter((item) => item.id !== id));
-  const removeFromWishlist = (id: string) => setWishlist(wishlist.filter((item) => item.id !== id));
+  const removeFromCart = (id: string) => { setCart(cart.filter((item) => item.id !== id)); showToast("ব্যাগ থেকে সরানো হয়েছে", "success"); };
+  const removeFromWishlist = (id: string) => { setWishlist(wishlist.filter((item) => item.id !== id)); showToast("রিমুভ করা হয়েছে", "success"); };
 
   const itemsSubtotal = cart.reduce((total, item) => total + (getNumericPrice(item.price) * item.quantity), 0);
   const cartTotal = itemsSubtotal + shippingFee;
   const totalItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); if(cart.length === 0) return alert("আপনার ব্যাগ খালি!");
+    e.preventDefault(); if(cart.length === 0) return showToast("আপনার ব্যাগ খালি!", "error");
     const finalPaymentMethodText = paymentMethod === 'COD' ? 'Cash on Delivery' : `${paymentMethod} (TrxID: ${transactionId})`;
     await processOrderExecution(finalPaymentMethodText);
   };
@@ -436,11 +463,14 @@ export default function Home() {
       };
       if (user && user.id) orderData.user_id = user.id;
 
-      const { error } = await supabase.from('orders').insert([orderData]); if (error) throw error;
+      const { data, error } = await supabase.from('orders').insert([orderData]).select(); 
+      if (error) throw error;
       if (user && user.id) fetchUserOrders(user.id);
       
-      setCart([]); setIsCheckoutOpen(false); setIsCartOpen(false); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setTransactionId(''); alert("অর্ডার সফলভাবে সম্পন্ন হয়েছে!");
-    } catch (error: any) { alert("অর্ডার প্লেস করতে সমস্যা হয়েছে: " + error.message); } finally { setIsCheckingOut(false); }
+      setCart([]); setIsCheckoutOpen(false); setIsCartOpen(false); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setTransactionId(''); 
+      const newId = data && data[0] ? data[0].id.split('-')[0] : 'CONFIRMED';
+      setOrderSuccess({show: true, orderId: newId});
+    } catch (error: any) { showToast("অর্ডার প্লেস করতে সমস্যা হয়েছে: " + error.message, "error"); } finally { setIsCheckingOut(false); }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -448,12 +478,12 @@ export default function Home() {
     try {
       if (authView === 'LOGIN') { 
          const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword }); 
-         if (error) throw error; alert("স্বাগতম!"); setShowAuthModal(false); 
+         if (error) throw error; showToast("স্বাগতম!", "success"); setShowAuthModal(false); 
       } else { 
          const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword }); 
-         if (error) throw error; alert("অ্যাকাউন্ট তৈরি হয়েছে!"); setShowAuthModal(false); 
+         if (error) throw error; showToast("অ্যাকাউন্ট তৈরি হয়েছে!", "success"); setShowAuthModal(false); 
       }
-    } catch (error: any) { alert(error.message); } finally { setAuthLoading(false); }
+    } catch (error: any) { showToast(error.message, "error"); } finally { setAuthLoading(false); }
   };
 
   const handleGoogleLogin = async () => {
@@ -462,31 +492,31 @@ export default function Home() {
       const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
       if (error) throw error;
     } catch (error: any) {
-      alert(error.message);
+      showToast(error.message, "error");
     } finally {
       setAuthLoading(false);
     }
   };
 
-  const handleLogout = async () => { const { error } = await supabase.auth.signOut(); if (!error) { alert("লগআউট সফল।"); setShowProfileModal(false); window.location.reload(); } };
+  const handleLogout = async () => { const { error } = await supabase.auth.signOut(); if (!error) { showToast("লগআউট সফল।", "success"); setShowProfileModal(false); window.location.reload(); } };
 
   const handleTrackOrder = async (e: React.FormEvent) => {
     e.preventDefault(); if (!trackingPhone) return; setIsTracking(true);
     try {
       const { data, error } = await supabase.from('orders').select('*').eq('customer_phone', trackingPhone).order('created_at', { ascending: false });
       if (error) throw error; setTrackedOrders(data || []);
-    } catch (error) { alert("অর্ডার খুঁজে পাওয়া যায়নি।"); } finally { setIsTracking(false); }
+    } catch (error) { showToast("অর্ডার খুঁজে পাওয়া যায়নি।", "error"); } finally { setIsTracking(false); }
   };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!viewingProduct) return; setIsReviewSubmitting(true);
     try {
       const { error } = await supabase.from('reviews').insert([{ product_id: viewingProduct.id, customer_name: newReviewName || 'গ্রাহক', rating: newReviewRating, comment: newReviewComment }]);
-      if (error) throw error; alert("রিভিউ সফলভাবে সাবমিট হয়েছে!"); setNewReviewComment(''); fetchReviews(viewingProduct.id); 
-    } catch (error) { alert("রিভিউ সাবমিট ব্যর্থ হয়েছে।"); } finally { setIsReviewSubmitting(false); }
+      if (error) throw error; showToast("রিভিউ সফলভাবে সাবমিট হয়েছে!", "success"); setNewReviewComment(''); fetchReviews(viewingProduct.id); 
+    } catch (error) { showToast("রিভিউ সাবমিট ব্যর্থ হয়েছে।", "error"); } finally { setIsReviewSubmitting(false); }
   };
 
-  const updateOrderStatus = async (id: string, newStatus: string) => { try { await supabase.from('orders').update({ status: newStatus }).eq('id', id); fetchOrders(); } catch(err) {} };
+  const updateOrderStatus = async (id: string, newStatus: string) => { try { await supabase.from('orders').update({ status: newStatus }).eq('id', id); fetchOrders(); showToast("স্ট্যাটাস আপডেট হয়েছে", "success"); } catch(err) {} };
 
   const getStatusColor = (status: string) => {
       switch(status) {
@@ -532,13 +562,13 @@ export default function Home() {
       }
       else if (type === 'custom_section' && catName) {
          setCustomSections(prev => prev.map(s => s.id === catName ? { ...s, imageUrl: publicUrl } : s));
-         alert("ব্যানার আপলোড হয়েছে! সেভ করতে নিচের Save বাটনে ক্লিক করুন।");
+         showToast("ব্যানার আপলোড হয়েছে! সেভ করতে নিচের Save বাটনে ক্লিক করুন।", "success");
          setUploadingType(null); return; 
       } 
       else if (type === 'product1') setNewImageUrl(publicUrl); else if (type === 'product2') setNewImageUrl2(publicUrl); else if (type === 'product3') setNewImageUrl3(publicUrl); else if (type === 'product4') setNewImageUrl4(publicUrl);
       
       fetchSettings(); 
-    } catch (error: any) { alert("আপলোড ব্যর্থ হয়েছে! কারণ:\n" + error.message); } finally { setUploadingType(null); }
+    } catch (error: any) { showToast("আপলোড ব্যর্থ হয়েছে! কারণ:\n" + error.message, "error"); } finally { setUploadingType(null); }
   };
 
   const handleRemoveImage = async (type: string, index?: number) => {
@@ -560,10 +590,10 @@ export default function Home() {
         const { error } = await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
         if(error) throw error;
       }
-      alert("ছবিটি সফলভাবে মুছে ফেলা হয়েছে!");
+      showToast("ছবিটি সফলভাবে মুছে ফেলা হয়েছে!", "success");
       fetchSettings(); 
     } catch (error: any) {
-      alert("রিমুভ করতে সমস্যা হয়েছে: " + error.message);
+      showToast("রিমুভ করতে সমস্যা হয়েছে: " + error.message, "error");
     }
   };
 
@@ -583,19 +613,19 @@ export default function Home() {
          'BRAND_NAME_COLOR': storeSettings.brand_name_color,
          'HEADING_COLOR': storeSettings.heading_color,
          'PAGE_TEXT_COLOR': storeSettings.page_text_color,
-         'FB_PAGE_URL': storeSettings.fb_page_url
+         'FB_PAGE_URL': storeSettings.fb_page_url,
+         'DEFAULT_SORT': storeSettings.default_sort
       };
       const { error } = await supabase.from('store_settings').update({ shop_name: storeSettings.shop_name, phone: storeSettings.phone, category_banners: newCatBanners }).eq('id', 1);
       if(error) throw error; 
-      alert("সেটিংস সফলভাবে সেভ হয়েছে!"); fetchSettings();
-    } catch (error: any) { alert("সেটিংস সেভ করতে সমস্যা হয়েছে:\n" + (error.message || JSON.stringify(error))); }
+      showToast("সেটিংস সফলভাবে সেভ হয়েছে!", "success"); fetchSettings();
+    } catch (error: any) { showToast("সেটিংস সেভ করতে সমস্যা হয়েছে:\n" + (error.message || JSON.stringify(error)), "error"); }
   };
 
-  // BULK PRICE UPDATE HANDLER
   const handleBulkPriceUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bulkCategory || !bulkOfferPrice) {
-      alert("ক্যাটাগরি এবং অফার প্রাইস অবশ্যই দিতে হবে!");
+      showToast("ক্যাটাগরি এবং অফার প্রাইস অবশ্যই দিতে হবে!", "error");
       return;
     }
     if (!window.confirm(`সত্যিই কি "${bulkCategory}" ক্যাটাগরির সকল প্রোডাক্টের দাম পরিবর্তন করতে চান?`)) return;
@@ -605,7 +635,7 @@ export default function Home() {
       const productsToUpdate = products.filter(p => (p.category || '').split(',').map(c=>c.trim()).includes(bulkCategory));
       
       if (productsToUpdate.length === 0) {
-        alert("এই ক্যাটাগরিতে কোনো প্রোডাক্ট পাওয়া যায়নি!");
+        showToast("এই ক্যাটাগরিতে কোনো প্রোডাক্ট পাওয়া যায়নি!", "error");
         setIsBulkUpdating(false);
         return;
       }
@@ -622,13 +652,13 @@ export default function Home() {
 
       if (error) throw error;
       
-      alert(`সফলভাবে ${productsToUpdate.length} টি প্রোডাক্টের দাম আপডেট হয়েছে!`);
+      showToast(`সফলভাবে ${productsToUpdate.length} টি প্রোডাক্টের দাম আপডেট হয়েছে!`, "success");
       setBulkOriginalPrice('');
       setBulkOfferPrice('');
       setBulkCategory('');
       fetchProducts();
     } catch (error: any) {
-      alert("আপডেট করতে সমস্যা হয়েছে: " + error.message);
+      showToast("আপডেট করতে সমস্যা হয়েছে: " + error.message, "error");
     } finally {
       setIsBulkUpdating(false);
     }
@@ -656,7 +686,7 @@ export default function Home() {
   const handleDeleteProduct = async (id: string, e?: React.MouseEvent) => { 
     if(e) e.stopPropagation(); 
     if (!window.confirm("সত্যিই কি প্রোডাক্টটি ডিলিট করতে চান?")) return; 
-    try { await supabase.from('products').delete().eq('id', id); fetchProducts(); alert("প্রোডাক্টটি সফলভাবে ডিলিট হয়েছে!"); } catch (error) { alert("ডিলিট ব্যর্থ।"); } 
+    try { await supabase.from('products').delete().eq('id', id); fetchProducts(); showToast("প্রোডাক্টটি সফলভাবে ডিলিট হয়েছে!", "success"); } catch (error) { showToast("ডিলিট ব্যর্থ।", "error"); } 
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -669,8 +699,8 @@ export default function Home() {
         description: newDescription || null, category: finalCategories.length > 0 ? finalCategories.join(', ') : "New Category", in_stock: newInStock, tag: newSubCategory, brand: newBrand || null, color: newColor || null
       };
       if (editingProductId) await supabase.from('products').update(productData).eq('id', editingProductId); else await supabase.from('products').insert([productData]);
-      setShowProductModal(false); fetchProducts(); alert("সফলভাবে সেভ হয়েছে!");
-    } catch (error: any) { alert("Error saving product: " + error.message); } finally { setIsSaving(false); }
+      setShowProductModal(false); fetchProducts(); showToast("সফলভাবে সেভ হয়েছে!", "success");
+    } catch (error: any) { showToast("Error saving product: " + error.message, "error"); } finally { setIsSaving(false); }
   };
 
   const handleSubCategoryClick = (catName: string, subName: string) => {
@@ -691,6 +721,16 @@ export default function Home() {
     (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.id || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Admin Controlled Smart Sorting Logic
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const priceA = getNumericPrice(a.price);
+    const priceB = getNumericPrice(b.price);
+    if (storeSettings.default_sort === 'lowToHigh') return priceA - priceB;
+    if (storeSettings.default_sort === 'highToLow') return priceB - priceA;
+    if (storeSettings.default_sort === 'newest') return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
+    return 0;
+  });
 
   const filteredAdminProducts = products.filter(item => 
     (item.name || '').toLowerCase().includes(adminSearchQuery.toLowerCase()) ||
@@ -746,7 +786,7 @@ export default function Home() {
             <button onClick={(e) => handleDirectOrder(item, 1, e)} disabled={!item.in_stock} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[12px] font-bold py-2.5 rounded-sm flex items-center justify-center gap-1.5 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300">
               ⚡ অর্ডার করুন
             </button>
-            <button onClick={(e) => { e.stopPropagation(); addToCart(item, 1); setIsCartOpen(true); }} disabled={!item.in_stock} className="w-full bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[12px] font-bold py-2.5 rounded-sm flex items-center justify-center gap-1.5 hover:bg-[#EADFC8] transition-colors duration-300">
+            <button onClick={(e) => { e.stopPropagation(); addToCart(item, 1); }} disabled={!item.in_stock} className="w-full bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[12px] font-bold py-2.5 rounded-sm flex items-center justify-center gap-1.5 hover:bg-[#EADFC8] transition-colors duration-300">
               🛒 ব্যাগে যোগ
             </button>
           </div>
@@ -757,7 +797,7 @@ export default function Home() {
 
   return (
     <>
-      <main className="min-h-screen text-[#111412] relative overflow-x-hidden scroll-smooth" 
+      <main className="min-h-screen text-[#111412] relative overflow-x-hidden scroll-smooth pb-16 md:pb-0" 
             style={{ 
               fontFamily: storeSettings.font_family,
               backgroundColor: "#FAF5EB",
@@ -769,6 +809,17 @@ export default function Home() {
         
         <style dangerouslySetInnerHTML={{__html: `
           @import url('https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@400;700&family=Atma:wght@400;700&family=Baloo+Da+2:wght@400;700&family=Cinzel:wght@400;700&family=Galada&family=Hind+Siliguri:wght@400;700&family=Mina:wght@400;700&family=Montserrat:wght@400;700&family=Noto+Serif+Bengali:wght@400;700&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;700&family=Roboto:wght@400;700&family=Tiro+Bangla&display=swap');
+          
+          @keyframes slideUp {
+             from { transform: translateY(100%); opacity: 0; }
+             to { transform: translateY(0); opacity: 1; }
+          }
+          @keyframes bounceShort {
+             0%, 100% { transform: translate(-50%, 0); }
+             50% { transform: translate(-50%, -10px); }
+          }
+          .animate-slide-up { animation: slideUp 0.5s ease-out forwards; }
+          .animate-bounce-short { animation: bounceShort 2s ease-in-out infinite; }
         `}} />
 
         <div className="relative z-10 min-h-screen pb-16 transition-colors duration-300"
@@ -789,7 +840,7 @@ export default function Home() {
 
           <header className="sticky top-0 z-40 bg-white border-b border-[#EADFC8] px-4 md:px-12 py-4 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center w-full md:w-auto justify-between md:justify-start gap-4 md:gap-6">
-              <button onClick={() => setIsSidebarOpen(true)} className="text-2xl text-[#111412] hover:text-[#D4AF37] transition-colors">☰</button>
+              <button onClick={() => setIsSidebarOpen(true)} className="text-2xl text-[#111412] hover:text-[#D4AF37] transition-colors md:block hidden">☰</button>
               <div className="flex items-center gap-4 cursor-pointer" onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}}>
                 <div className="relative flex items-center justify-center p-1.5">
                   <div className="absolute inset-0 rounded-full border-l-[3px] border-b-[3px] border-[#D4AF37] shadow-[-3px_3px_8px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
@@ -844,13 +895,16 @@ export default function Home() {
               </div>
             )}
 
-            {activeCategory !== 'All' && (
-              <div className="w-full flex justify-start mb-2 mt-4">
-                  <button onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}} className="flex items-center gap-2 bg-[#111412] text-[#D4AF37] px-6 py-2.5 rounded-sm shadow-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold uppercase tracking-[0.2em] text-xs border border-[#D4AF37]">
+            {/* Back Button Container (Sorting is now handled from Admin Panel) */}
+            <div className="w-full flex justify-between items-center mb-2 mt-4 bg-white p-3 rounded-sm border border-[#EADFC8] shadow-sm">
+               {activeCategory !== 'All' ? (
+                  <button onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}} className="flex items-center gap-2 bg-[#111412] text-[#D4AF37] px-4 md:px-6 py-2 md:py-2.5 rounded-sm shadow-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs border border-[#D4AF37]">
                       <span className="text-lg leading-none -mt-0.5">←</span> Back to Home
                   </button>
-              </div>
-            )}
+               ) : (
+                  <span className="text-[#111412] font-bold uppercase tracking-widest text-[11px] hidden md:block w-full text-center">Premium Collections</span>
+               )}
+            </div>
 
             <div id="products-section" className="w-full mt-2 flex flex-col gap-20">
                {loading ? (
@@ -863,7 +917,7 @@ export default function Home() {
                       if (activeCategory === 'All' && specialCategories.includes(section.title)) return null;
                       if (activeCategory !== 'All' && activeCategory !== section.title) return null;
                       
-                      const catProducts = filteredProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(section.title));
+                      const catProducts = sortedProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(section.title));
                       if (catProducts.length === 0 && !section.imageUrl) return null;
 
                       const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
@@ -905,7 +959,7 @@ export default function Home() {
                       if (activeCategory === 'All' && specialCategories.includes(catTitle)) return null;
                       if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
                       
-                      const catProducts = filteredProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(catTitle));
+                      const catProducts = sortedProducts.filter(item => (item.category || '').split(',').map(c=>c.trim()).includes(catTitle));
                       if (catProducts.length === 0) return null;
 
                       const subCats = Array.from(new Set(catProducts.map(p => p.tag).filter(Boolean))) as string[];
@@ -962,13 +1016,34 @@ export default function Home() {
 
         {/* Facebook Messenger Floating Button */}
         {storeSettings.fb_page_url && (
-           <a href={storeSettings.fb_page_url} target="_blank" rel="noopener noreferrer" className="fixed bottom-20 right-6 z-[250] bg-[#1877F2] text-white p-3.5 rounded-full shadow-2xl hover:bg-[#166FE5] transition-transform hover:scale-110 border-2 border-white">
+           <a href={storeSettings.fb_page_url} target="_blank" rel="noopener noreferrer" className="fixed bottom-24 md:bottom-20 right-6 z-[250] bg-[#1877F2] text-white p-3.5 rounded-full shadow-2xl hover:bg-[#166FE5] transition-transform hover:scale-110 border-2 border-white hidden md:flex">
               <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 0C5.373 0 0 5.068 0 11.321c0 3.565 1.763 6.744 4.538 8.87v3.809l4.168-2.292c1.05.292 2.158.448 3.294.448 6.627 0 12-5.068 12-11.321S18.627 0 12 0zm1.206 15.352l-3.08-3.295-6.002 3.295 6.623-7.039 3.167 3.295 5.915-3.295-6.623 7.039z"/></svg>
            </a>
         )}
 
+        {/* Mobile Bottom Navigation Bar */}
+        <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-[#EADFC8] flex justify-between items-center z-[250] shadow-[0_-5px_15px_rgba(212,175,55,0.15)] text-[#111412] h-16">
+           <button onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors"> 
+              <span className="text-xl leading-none">🏠</span> 
+              <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Home</span> 
+           </button>
+           <button onClick={() => setIsSidebarOpen(true)} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors"> 
+              <span className="text-xl leading-none">☰</span> 
+              <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Menu</span> 
+           </button>
+           <button onClick={() => setIsCartOpen(true)} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors relative"> 
+              <span className="text-xl leading-none">🛒</span> 
+              {cart.length > 0 && <span className="absolute top-2 right-4 bg-[#D4AF37] text-[#111412] border border-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">{totalItemsCount}</span>} 
+              <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Bag</span> 
+           </button>
+           <button onClick={() => user ? setShowProfileModal(true) : setShowAuthModal(true)} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors"> 
+              <span className="text-xl leading-none">👤</span> 
+              <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Account</span> 
+           </button>
+        </div>
+
         {isAdmin && (
-          <div className="fixed bottom-0 left-0 w-full bg-[#111412] text-[#D4AF37] border-t border-[#D4AF37]/30 z-[250] flex justify-between items-center px-6 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+          <div className="fixed bottom-16 md:bottom-0 left-0 w-full bg-[#111412] text-[#D4AF37] border-t border-[#D4AF37]/30 z-[250] flex justify-between items-center px-6 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
             <div className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span> Premium Admin
             </div>
@@ -982,6 +1057,45 @@ export default function Home() {
 
       {/* ALL MODALS PLACED OUTSIDE <MAIN> TO PREVENT Z-INDEX AND CSS CLIPPING ISSUES */}
       <div style={{ position: 'relative', zIndex: 99999 }}>
+        
+        {/* PREMIUM TOAST NOTIFICATION */}
+        {toastMessage && (
+          <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.2)] z-[999999] flex items-center gap-3 animate-bounce-short text-xs font-black tracking-widest text-white uppercase ${toastMessage.type === 'success' ? 'bg-[#111412] border border-[#D4AF37]' : 'bg-red-600 border border-white'}`}>
+              <span className="text-lg">{toastMessage.type === 'success' ? '✅' : '⚠️'}</span>
+              {toastMessage.msg}
+          </div>
+        )}
+
+        {/* SOCIAL PROOF (FOMO) POPUP */}
+        {fomoMsg && (
+           <div className="fixed bottom-24 md:bottom-8 left-4 md:left-8 bg-white border border-[#D4AF37] p-3 rounded-md shadow-[0_5px_20px_rgba(212,175,55,0.4)] z-[9998] flex items-center gap-4 animate-slide-up max-w-[280px]">
+              <div className="w-12 h-12 rounded overflow-hidden border border-[#EADFC8] shrink-0 bg-[#FAF5EB]">
+                 <img src={fomoMsg.image_url || ''} className="w-full h-full object-cover"/>
+              </div>
+              <div className="flex-1">
+                 <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Eimatro Order Hoyeche!</p>
+                 <p className="text-[11px] font-bold text-[#111412] line-clamp-1">{fomoMsg.name}</p>
+                 <p className="text-[9px] text-[#B8860B] font-black mt-0.5 tracking-widest">From: Dhaka</p>
+              </div>
+           </div>
+        )}
+
+        {/* ORDER SUCCESS MODAL (CONFETTI ALTERNATIVE) */}
+        {orderSuccess.show && (
+           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[2000] p-4">
+              <div className="bg-white p-10 rounded-sm text-center max-w-sm w-full relative overflow-hidden shadow-2xl border border-[#D4AF37]">
+                 <div className="absolute top-0 left-0 w-full h-2 bg-[#D4AF37] animate-pulse"></div>
+                 <div className="w-24 h-24 bg-[#FAF5EB] rounded-full border-4 border-[#D4AF37] flex items-center justify-center mx-auto mb-6 shadow-inner relative">
+                    <span className="text-5xl animate-bounce">🎉</span>
+                 </div>
+                 <h2 className="text-3xl font-black text-[#111412] mb-3 uppercase tracking-widest drop-shadow-sm">Alhamdulillah!</h2>
+                 <p className="text-gray-600 mb-2 font-bold text-sm tracking-wide">আপনার অর্ডারটি সফলভাবে রিসিভ হয়েছে।</p>
+                 <p className="text-[11px] font-black text-[#B8860B] mb-8 tracking-[0.2em] uppercase bg-[#FAF5EB] p-2 rounded-sm border border-[#EADFC8]">Order ID: #{orderSuccess.orderId}</p>
+                 <button onClick={() => setOrderSuccess({show:false, orderId:''})} className="w-full bg-[#111412] text-[#D4AF37] font-bold py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-[#D4AF37] hover:text-[#111412] transition-colors border border-[#D4AF37] shadow-md">ওকে, ধন্যবাদ</button>
+              </div>
+           </div>
+        )}
+
         {infoModal && (
           <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4">
              <div className="bg-white border-2 border-[#D4AF37] max-w-2xl w-full p-8 md:p-12 relative rounded-sm shadow-2xl">
@@ -1046,7 +1160,7 @@ export default function Home() {
         {viewingProduct && (() => {
           const viewingDiscount = viewingProduct.original_price ? calculateDiscount(viewingProduct.original_price, viewingProduct.price) : 0;
           return (
-          <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto" onClick={() => setViewingProduct(null)}>
+          <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto z-[1000]" onClick={() => setViewingProduct(null)}>
             <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-4 md:px-8 md:py-5 shadow-sm sticky top-0 z-30">
                  <button onClick={() => setViewingProduct(null)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white px-5 py-2.5 rounded-sm shadow-sm">
@@ -1097,17 +1211,21 @@ export default function Home() {
 
                      <div className="flex flex-col gap-3.5 mb-10">
                          <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={!viewingProduct.in_stock} className="w-full bg-[#111412] text-white font-bold py-4 rounded-sm hover:bg-[#333] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-md">
-                           ⚡ অর্ডার করুন
+                           ⚡ সরাসরি অর্ডার করুন
                          </button>
-                         <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); setIsCartOpen(true); setViewingProduct(null); }} disabled={!viewingProduct.in_stock} className="w-full bg-[#2a2a2a] text-white font-bold py-4 rounded-sm hover:bg-[#444] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
-                           🛒 ব্যাগে যোগ
+                         <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); }} disabled={!viewingProduct.in_stock} className="w-full bg-[#2a2a2a] text-white font-bold py-4 rounded-sm hover:bg-[#444] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
+                           🛒 ব্যাগে যোগ করুন
                          </button>
+                         
+                         {/* WhatsApp Order Feature */}
+                         <a href={`https://wa.me/88${storeSettings.phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম, আমি এই প্রোডাক্টটি নিতে চাই:\n\nনাম: ${viewingProduct.name}\nদাম: ৳${viewingProduct.price}\nআইডি: ${viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm uppercase">
+                           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z"/></svg>
+                           হোয়াটসঅ্যাপে অর্ডার
+                         </a>
+                         
                          <a href={storeSettings.fb_page_url} target="_blank" rel="noopener noreferrer" className="w-full bg-[#1877F2] text-white font-bold py-4 rounded-sm hover:bg-[#166FE5] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                            ফেসবুকে মেসেজ দিন
-                         </a>
-                         <a href={`tel:${storeSettings.phone}`} className="w-full bg-[#3d3d3d] text-white font-bold py-4 rounded-sm hover:bg-[#222] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
-                           📞 কল অর্ডার {storeSettings.phone}
                          </a>
                      </div>
 
@@ -1513,6 +1631,26 @@ export default function Home() {
                             </div>
                           </div>
                         </div>
+                      </div>
+
+                      {/* NEW FEATURE: Admin Controlled Global Product Sort */}
+                      <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm mb-8">
+                           <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Global Product Sorting</label>
+                           <div className="flex flex-col md:flex-row items-center gap-6">
+                             <div className="flex-1 w-full">
+                                <p className="text-xs text-gray-600 font-bold mb-3 tracking-widest">Select how products should be arranged for customers:</p>
+                                <select value={storeSettings.default_sort} onChange={e=>setStoreSettings({...storeSettings, default_sort: e.target.value})} className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm font-bold outline-none focus:border-[#D4AF37] shadow-inner cursor-pointer uppercase tracking-widest">
+                                   <option value="lowToHigh">Price: Low to High</option>
+                                   <option value="highToLow">Price: High to Low</option>
+                                   <option value="newest">Newest Uploaded First</option>
+                                </select>
+                             </div>
+                             <div className="flex-1 border border-[#D4AF37]/50 bg-[#FAF5EB] p-4 rounded-sm">
+                                <p className="text-[10px] font-bold text-[#B8860B] uppercase tracking-widest leading-relaxed">
+                                   💡 "Price: Low to High" সিলেক্ট রাখলে ওয়েবসাইটের সব ক্যাটাগরিতে অটোমেটিক কম দামের প্রোডাক্টগুলো সবার আগে শো করবে।
+                                </p>
+                             </div>
+                           </div>
                       </div>
 
                       <div className="mb-8 bg-white p-8 border border-[#EADFC8] rounded-sm shadow-sm">
