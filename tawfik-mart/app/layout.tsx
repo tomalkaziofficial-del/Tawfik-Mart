@@ -9,8 +9,24 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Zeenat Mart - E-commerce",
-  description: "Best online shopping in BD",
+  title: "Zeenat Mart | Premium Islamic Lifestyle",
+  description: "বাংলাদেশের অন্যতম সেরা প্রিমিয়াম ইসলামিক লাইফস্টাইল এবং ফ্যাশন অনলাইন শপ।",
+  openGraph: {
+    title: "Zeenat Mart | Premium Islamic Lifestyle",
+    description: "বাংলাদেশের অন্যতম সেরা প্রিমিয়াম ইসলামিক লাইফস্টাইল এবং ফ্যাশন অনলাইন শপ।",
+    url: "https://zeenat-mart.com",
+    siteName: "Zeenat Mart",
+    images: [
+      {
+        url: "https://zeenat-mart.com/banner.jpg", 
+        width: 1200,
+        height: 630,
+        alt: "Zeenat Mart Premium Collection",
+      },
+    ],
+    locale: "bn_BD",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

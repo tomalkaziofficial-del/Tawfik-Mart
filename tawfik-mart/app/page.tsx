@@ -87,7 +87,7 @@ export default function Home() {
 
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [activeImage, setActiveImage] = useState<string>(''); // FIXED: Error resolved here
+  const [activeImage, setActiveImage] = useState<string>(''); 
   
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -779,7 +779,7 @@ export default function Home() {
 
         <div className="w-full bg-[#FAF5EB] relative overflow-hidden flex items-center justify-center border-b border-[#EADFC8] h-[240px]">
              {item.image_url ? (
-               <img src={item.image_url} className="w-full h-full object-cover absolute inset-0 group-hover:scale-105 transition-transform duration-700 ease-in-out" />
+               <img src={item.image_url} loading="lazy" decoding="async" className="w-full h-full object-cover absolute inset-0 group-hover:scale-105 transition-transform duration-700 ease-in-out" />
              ) : (
                <span className="text-gray-400 text-xs font-medium">No Image</span>
              )}
@@ -841,6 +841,13 @@ export default function Home() {
              background: linear-gradient(to right, #FAF5EB 4%, #F2E9D8 25%, #FAF5EB 36%);
              background-size: 1000px 100%;
           }
+          /* Custom Rich Text Styling for Black Product Details Box */
+          .custom-html-content h1 { font-size: 24px; font-weight: bold; color: #D4AF37; margin-bottom: 8px; }
+          .custom-html-content h2 { font-size: 20px; font-weight: bold; color: #D4AF37; margin-bottom: 8px; }
+          .custom-html-content h3 { font-size: 16px; font-weight: bold; color: #D4AF37; margin-bottom: 6px; }
+          .custom-html-content b, .custom-html-content strong { color: #fff; font-weight: 900; }
+          .custom-html-content ul { list-style-type: disc; padding-left: 20px; margin-bottom: 8px; }
+          .custom-html-content li { margin-bottom: 4px; }
         `}} />
 
         <div className="relative z-10 min-h-screen pb-16 transition-colors duration-300"
@@ -866,7 +873,7 @@ export default function Home() {
                 <div className="relative flex items-center justify-center p-1.5">
                   <div className="absolute inset-0 rounded-full border-l-[3px] border-b-[3px] border-[#D4AF37] shadow-[-3px_3px_8px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
                   <div className="w-12 h-12 md:w-14 md:h-14 bg-[#111412] flex items-center justify-center font-bold text-2xl rounded-full overflow-hidden z-10 relative">
-                    {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : <span className="text-[#D4AF37] font-serif italic text-3xl">🌙</span>}
+                    {storeSettings.logo_url ? <img src={storeSettings.logo_url} loading="lazy" className="w-full h-full object-cover"/> : <span className="text-[#D4AF37] font-serif italic text-3xl">🌙</span>}
                   </div>
                 </div>
                 <div className="flex flex-col justify-center">
@@ -987,7 +994,7 @@ export default function Home() {
                         
                         {section && section.imageUrl && activeCategory === 'All' && (
                           <div className="w-full mb-10 shadow-md rounded-sm overflow-hidden border border-[#EADFC8] relative bg-[#FAF5EB]" style={{ height: section.imageHeight ? `${section.imageHeight}px` : '300px' }}>
-                            <img src={section.imageUrl} alt={section.title} className="w-full h-full absolute inset-0" style={{ objectFit: 'fill', width: '100%', height: '100%' }} />
+                            <img src={section.imageUrl} loading="lazy" alt={section.title} className="w-full h-full absolute inset-0" style={{ objectFit: 'fill', width: '100%', height: '100%' }} />
                           </div>
                         )}
 
@@ -1077,7 +1084,7 @@ export default function Home() {
         {fomoMsg && (
            <div className="fixed bottom-24 md:bottom-8 left-4 md:left-8 bg-white border border-[#D4AF37] p-3 rounded-md shadow-[0_5px_20px_rgba(212,175,55,0.4)] z-[9998] flex items-center gap-4 animate-slide-up max-w-[280px]">
               <div className="w-12 h-12 rounded overflow-hidden border border-[#EADFC8] shrink-0 bg-[#FAF5EB]">
-                 <img src={fomoMsg.image_url || ''} className="w-full h-full object-cover"/>
+                 <img src={fomoMsg.image_url || ''} loading="lazy" className="w-full h-full object-cover"/>
               </div>
               <div className="flex-1">
                  <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Eimatro Order Hoyeche!</p>
@@ -1189,7 +1196,7 @@ export default function Home() {
                   <div className="w-full md:w-1/2 flex flex-col gap-6">
                     {[viewingProduct.image_url, viewingProduct.image_url_2, viewingProduct.image_url_3, viewingProduct.image_url_4].filter(Boolean).map((img, idx) => (
                       <div key={idx} className="w-full bg-white rounded-sm border border-[#EADFC8] flex items-center justify-center p-2 overflow-hidden shadow-sm relative group cursor-zoom-in">
-                         <img src={img as string} className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.5] origin-center" />
+                         <img src={img as string} loading="lazy" className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.5] origin-center" />
                       </div>
                     ))}
                   </div>
@@ -1237,6 +1244,7 @@ export default function Home() {
                            🛒 ব্যাগে যোগ করুন
                          </button>
                          
+                         {/* WhatsApp Order Feature */}
                          <a href={`https://wa.me/88${storeSettings.phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম, আমি এই প্রোডাক্টটি নিতে চাই:\n\nনাম: ${viewingProduct.name}\nদাম: ৳${viewingProduct.price}\nআইডি: ${viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm uppercase">
                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z"/></svg>
                            হোয়াটসঅ্যাপে অর্ডার
@@ -1248,9 +1256,13 @@ export default function Home() {
                          </a>
                      </div>
 
-                     <div className="text-gray-700 bg-white p-6 rounded-sm border border-[#EADFC8] shadow-sm">
-                        <h4 className="text-sm font-bold mb-3 uppercase tracking-widest border-b border-[#D4AF37]/30 pb-2 inline-block" style={{ color: storeSettings.heading_color || '#B8860B' }}>PRODUCT DETAILS</h4>
-                        <p className="text-[13px] leading-relaxed whitespace-pre-wrap font-medium mt-2" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।"}</p>
+                     {/* PREMIUM BLACK PRODUCT DETAILS BOX */}
+                     <div className="bg-[#111412] p-6 rounded-sm border border-[#D4AF37] shadow-[0_5px_20px_rgba(212,175,55,0.15)] mt-4">
+                        <h4 className="text-sm font-bold mb-4 uppercase tracking-widest border-b border-[#D4AF37]/30 pb-2 inline-block text-[#D4AF37]">PRODUCT DETAILS</h4>
+                        <div 
+                          className="text-[14px] leading-relaxed font-medium mt-2 text-[#EADFC8] custom-html-content" 
+                          dangerouslySetInnerHTML={{ __html: (viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।").replace(/\n/g, '<br/>') }}
+                        />
                      </div>
                   </div>
                 </div>
@@ -1354,7 +1366,7 @@ export default function Home() {
                      {cart.map((item) => (
                        <div key={item.id} className="flex border-b border-[#EADFC8] last:border-0 p-3 items-center text-sm">
                           <div className="w-16 h-16 border border-[#EADFC8] mr-4 shrink-0 rounded-sm overflow-hidden bg-[#FAF5EB]">
-                             <img src={item.image_url||''} className="w-full h-full object-cover"/>
+                             <img src={item.image_url||''} loading="lazy" className="w-full h-full object-cover"/>
                           </div>
                           <div className="flex-1 leading-tight">
                              <p className="font-bold text-[#111412] text-[13px] line-clamp-1">{item.name}</p>
@@ -1416,7 +1428,7 @@ export default function Home() {
                 {cart.map(item => (
                   <div key={item.id} className="flex items-center justify-between bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
                     <div className="flex gap-4 items-center w-2/3">
-                      <img src={item.image_url||''} className="w-16 h-16 border border-[#EADFC8] bg-white rounded-sm object-cover shrink-0"/>
+                      <img src={item.image_url||''} loading="lazy" className="w-16 h-16 border border-[#EADFC8] bg-white rounded-sm object-cover shrink-0"/>
                       <div><p className="text-[12px] font-bold text-[#111412] leading-tight line-clamp-2">{item.name}</p><p className="text-[11px] font-black mt-2 text-[#B8860B]">{formatPrice(item.price)} x {item.quantity}</p></div>
                     </div>
                     <div className="flex flex-col items-end gap-3">
@@ -1452,7 +1464,7 @@ export default function Home() {
                 {wishlist.length === 0 ? <p className="text-center text-gray-500 mt-16 font-bold tracking-[0.2em] uppercase text-xs border border-dashed border-[#D4AF37]/50 p-8 rounded-sm bg-[#FAF5EB]">উইশলিস্টে কিছু নেই।</p> : wishlist.map(item => (
                   <div key={item.id} className="flex justify-between items-center bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
                     <div className="flex items-center gap-4">
-                      <img src={item.image_url||''} className="w-16 h-16 border border-[#EADFC8] bg-white object-cover rounded-sm shadow-sm"/>
+                      <img src={item.image_url||''} loading="lazy" className="w-16 h-16 border border-[#EADFC8] bg-white object-cover rounded-sm shadow-sm"/>
                       <div>
                         <p className="text-[12px] font-bold text-[#111412] leading-tight line-clamp-2">{item.name}</p>
                         <p className="text-[#B8860B] text-xs font-black mt-2">{formatPrice(item.price)} ৳</p>
@@ -1708,7 +1720,6 @@ export default function Home() {
                          </div>
                       </div>
 
-                      {/* NEW: Admin Controllable Gamified Free Delivery */}
                       <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm mb-8 mt-6">
                          <label className="text-[10px] font-bold mb-4 block text-[#25D366] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Gamified Free Delivery Offer (ফ্রি ডেলিভারি টার্গেট)</label>
                          <div className="flex flex-col md:flex-row items-center gap-6">
@@ -2046,7 +2057,13 @@ export default function Home() {
                   <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-[0.2em] uppercase">Add a sub-category to filter products inside the main category.</p>
                 </div>
 
-                <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description</label><textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea></div>
+                {/* UPDATED: Description Input with HTML Hint */}
+                <div>
+                  <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description (HTML Support Available)</label>
+                  <textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea>
+                  <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-widest">💡 আপনি চাইলে সাধারণ লেখার পাশাপাশি HTML ট্যাগ ব্যবহার করে লেখাকে স্টাইল করতে পারেন। যেমন: &lt;b&gt;বোল্ড&lt;/b&gt;, &lt;h2&gt;বড় লেখা&lt;/h2&gt;</p>
+                </div>
+
                 <div className="flex items-center gap-4 bg-white p-4 border border-[#EADFC8] rounded-sm shadow-sm"><input type="checkbox" checked={newInStock} onChange={e => setNewInStock(e.target.checked)} className="w-5 h-5 accent-[#D4AF37] cursor-pointer"/><label className="text-[11px] font-bold text-[#111412] uppercase tracking-[0.2em]">In Stock</label></div>
                 
                 <div className="flex gap-4 mt-6">
