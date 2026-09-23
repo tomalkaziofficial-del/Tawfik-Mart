@@ -206,6 +206,59 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const openProductModal = (product: Product) => {
+    setViewingProduct(product);
+    setActiveImage(product.image_url || '');
+    setSelectedQuantity(1);
+    if (typeof window !== "undefined") {
+      const newUrl = `${window.location.pathname}?product=${product.id}`;
+      window.history.pushState({ productId: product.id }, '', newUrl);
+    }
+  };
+
+  const closeProductModal = () => {
+    setViewingProduct(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('product');
+      window.history.pushState({}, '', url.pathname);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const pid = params.get('product');
+        if (pid && products.length > 0) {
+          const found = products.find(p => p.id === pid);
+          if (found) {
+            setViewingProduct(found);
+            setActiveImage(found.image_url || '');
+            return;
+          }
+        }
+        setViewingProduct(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [products]);
+
+  useEffect(() => {
+    if (products.length > 0 && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get('product');
+      if (pid) {
+        const found = products.find(p => p.id === pid);
+        if (found) {
+          setViewingProduct(found);
+          setActiveImage(found.image_url || '');
+        }
+      }
+    }
+  }, [products]);
+
   useEffect(() => {
     if (showAuthModal) {
       setAuthView('LOGIN');
@@ -446,7 +499,7 @@ export default function Home() {
     if(e) e.stopPropagation(); if(!product.in_stock) return showToast("দুঃখিত, এই প্রোডাক্টটি বর্তমানে স্টকে নেই!", "error");
     const existing = cart.find(item => item.id === product.id);
     if (!existing) setCart([...cart, { ...product, quantity: qty }]);
-    setViewingProduct(null); setIsCartOpen(false); setIsCheckoutOpen(true); 
+    closeProductModal(); setIsCartOpen(false); setIsCheckoutOpen(true); 
   };
 
   const updateQuantity = (id: string, delta: number) => { setCart(cart.map(item => { if (item.id === id) { const newQty = item.quantity + delta; return newQty > 0 ? { ...item, quantity: newQty } : item; } return item; })); };
@@ -758,7 +811,7 @@ export default function Home() {
     const inWishlist = wishlist.some(w => w.id === item.id);
 
     return (
-      <div key={item.id} className="bg-white border border-[#EADFC8] flex flex-col relative w-full overflow-hidden hover:shadow-[0_8px_30px_rgb(212,175,55,0.15)] hover:border-[#D4AF37] transition-all duration-500 group cursor-pointer rounded-md" onClick={() => { setViewingProduct(item); setActiveImage(item.image_url || ''); setSelectedQuantity(1); }}>
+      <div key={item.id} className="bg-white border border-[#EADFC8] flex flex-col relative w-full overflow-hidden hover:shadow-[0_8px_30px_rgb(212,175,55,0.15)] hover:border-[#D4AF37] transition-all duration-500 group cursor-pointer rounded-md" onClick={() => openProductModal(item)}>
         
         {discount > 0 && (
           <div className="absolute top-2 right-2 bg-red-500 text-white text-[11px] font-bold rounded-full w-10 h-10 flex flex-col items-center justify-center z-10 leading-tight shadow-md border-2 border-white">
@@ -841,7 +894,6 @@ export default function Home() {
              background: linear-gradient(to right, #FAF5EB 4%, #F2E9D8 25%, #FAF5EB 36%);
              background-size: 1000px 100%;
           }
-          /* Custom Rich Text Styling for Black Product Details Box */
           .custom-html-content h1 { font-size: 24px; font-weight: bold; color: #D4AF37; margin-bottom: 8px; }
           .custom-html-content h2 { font-size: 20px; font-weight: bold; color: #D4AF37; margin-bottom: 8px; }
           .custom-html-content h3 { font-size: 16px; font-weight: bold; color: #D4AF37; margin-bottom: 6px; }
@@ -869,7 +921,7 @@ export default function Home() {
           <header className="sticky top-0 z-40 bg-white border-b border-[#EADFC8] px-4 md:px-12 py-4 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center w-full md:w-auto justify-between md:justify-start gap-4 md:gap-6">
               <button onClick={() => setIsSidebarOpen(true)} className="text-2xl text-[#111412] hover:text-[#D4AF37] transition-colors md:block hidden">☰</button>
-              <div className="flex items-center gap-4 cursor-pointer" onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}}>
+              <div className="flex items-center gap-4 cursor-pointer" onClick={() => {setActiveCategory('All'); closeProductModal(); window.scrollTo(0,0);}}>
                 <div className="relative flex items-center justify-center p-1.5">
                   <div className="absolute inset-0 rounded-full border-l-[3px] border-b-[3px] border-[#D4AF37] shadow-[-3px_3px_8px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
                   <div className="w-12 h-12 md:w-14 md:h-14 bg-[#111412] flex items-center justify-center font-bold text-2xl rounded-full overflow-hidden z-10 relative">
@@ -900,11 +952,11 @@ export default function Home() {
           </header>
 
           <div className="hidden md:flex justify-center items-center gap-8 py-3.5 bg-white border-b border-[#EADFC8] text-[11px] font-bold text-[#111412] uppercase tracking-[0.15em]">
-             <span className={`cursor-pointer transition-colors ${activeCategory === 'All' ? 'text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}}>সকল ক্যাটাগরি</span>
-             <span className={`cursor-pointer transition-colors ${activeCategory === '⚡ ফ্লাশ সেল' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('⚡ ফ্লাশ সেল'); window.scrollTo(0,0);}}>⚡ ফ্লাশ সেল</span>
-             <span className={`cursor-pointer transition-colors ${activeCategory === 'নতুন কালেকশন' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('নতুন কালেকশন'); window.scrollTo(0,0);}}>নতুন কালেকশন</span>
-             <span className={`cursor-pointer transition-colors ${activeCategory === 'এক্সক্লুসিভ' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('এক্সক্লুসিভ'); window.scrollTo(0,0);}}>এক্সক্লুসিভ</span>
-             <span className={`cursor-pointer transition-colors ${activeCategory === 'সকল ব্র্যান্ড' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('সকল ব্র্যান্ড'); window.scrollTo(0,0);}}>সকল ব্র্যান্ড</span>
+             <span className={`cursor-pointer transition-colors ${activeCategory === 'All' ? 'text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('All'); closeProductModal(); window.scrollTo(0,0);}}>সকল ক্যাটাগরি</span>
+             <span className={`cursor-pointer transition-colors ${activeCategory === '⚡ ফ্লাশ সেল' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('⚡ ফ্লাশ সেল'); closeProductModal(); window.scrollTo(0,0);}}>⚡ ফ্লাশ সেল</span>
+             <span className={`cursor-pointer transition-colors ${activeCategory === 'নতুন কালেকশন' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('নতুন কালেকশন'); closeProductModal(); window.scrollTo(0,0);}}>নতুন কালেকশন</span>
+             <span className={`cursor-pointer transition-colors ${activeCategory === 'এক্সক্লুসিভ' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('এক্সক্লুসিভ'); closeProductModal(); window.scrollTo(0,0);}}>এক্সক্লুসিভ</span>
+             <span className={`cursor-pointer transition-colors ${activeCategory === 'সকল ব্র্যান্ড' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('সকল ব্র্যান্ড'); closeProductModal(); window.scrollTo(0,0);}}>সকল ব্র্যান্ড</span>
           </div>
 
           <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-12">
@@ -925,7 +977,7 @@ export default function Home() {
 
             <div className="w-full flex justify-between items-center mb-2 mt-4 bg-white p-3 rounded-sm border border-[#EADFC8] shadow-sm">
                {activeCategory !== 'All' ? (
-                  <button onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}} className="flex items-center gap-2 bg-[#111412] text-[#D4AF37] px-4 md:px-6 py-2 md:py-2.5 rounded-sm shadow-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs border border-[#D4AF37]">
+                  <button onClick={() => {setActiveCategory('All'); closeProductModal(); window.scrollTo(0,0);}} className="flex items-center gap-2 bg-[#111412] text-[#D4AF37] px-4 md:px-6 py-2 md:py-2.5 rounded-sm shadow-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs border border-[#D4AF37]">
                       <span className="text-lg leading-none -mt-0.5">←</span> Back to Home
                   </button>
                ) : (
@@ -980,7 +1032,7 @@ export default function Home() {
                       <div key={catTitle} className="w-full">
                         <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-12">
                            <h2 className="font-bold tracking-wide" style={{ fontSize: section?.fontSize ? `${section.fontSize}px` : '30px', color: section?.color || storeSettings.heading_color || '#B8860B' }}>{catTitle}</h2>
-                           <button onClick={() => {setActiveCategory(catTitle); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
+                           <button onClick={() => {setActiveCategory(catTitle); closeProductModal(); window.scrollTo(0,0);}} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
                         </div>
 
                         {subCats.length > 0 && (
@@ -1037,7 +1089,7 @@ export default function Home() {
 
         {/* Mobile Bottom Navigation Bar */}
         <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-[#EADFC8] flex justify-between items-center z-[250] shadow-[0_-5px_15px_rgba(212,175,55,0.15)] text-[#111412] h-16">
-           <button onClick={() => {setActiveCategory('All'); window.scrollTo(0,0);}} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors"> 
+           <button onClick={() => {setActiveCategory('All'); closeProductModal(); window.scrollTo(0,0);}} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors"> 
               <span className="text-xl leading-none">🏠</span> 
               <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Home</span> 
            </button>
@@ -1069,10 +1121,8 @@ export default function Home() {
         )}
       </main>
 
-      {/* ALL MODALS PLACED OUTSIDE <MAIN> TO PREVENT Z-INDEX AND CSS CLIPPING ISSUES */}
       <div style={{ position: 'relative', zIndex: 99999 }}>
         
-        {/* PREMIUM TOAST NOTIFICATION */}
         {toastMessage && (
           <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.2)] z-[999999] flex items-center gap-3 animate-bounce-short text-xs font-black tracking-widest text-white uppercase ${toastMessage.type === 'success' ? 'bg-[#111412] border border-[#D4AF37]' : 'bg-red-600 border border-white'}`}>
               <span className="text-lg">{toastMessage.type === 'success' ? '✅' : '⚠️'}</span>
@@ -1080,7 +1130,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* SOCIAL PROOF (FOMO) POPUP */}
         {fomoMsg && (
            <div className="fixed bottom-24 md:bottom-8 left-4 md:left-8 bg-white border border-[#D4AF37] p-3 rounded-md shadow-[0_5px_20px_rgba(212,175,55,0.4)] z-[9998] flex items-center gap-4 animate-slide-up max-w-[280px]">
               <div className="w-12 h-12 rounded overflow-hidden border border-[#EADFC8] shrink-0 bg-[#FAF5EB]">
@@ -1094,7 +1143,6 @@ export default function Home() {
            </div>
         )}
 
-        {/* ORDER SUCCESS MODAL (CONFETTI ALTERNATIVE) */}
         {orderSuccess.show && (
            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[2000] p-4">
               <div className="bg-white p-10 rounded-sm text-center max-w-sm w-full relative overflow-hidden shadow-2xl border border-[#D4AF37]">
@@ -1140,16 +1188,16 @@ export default function Home() {
               </div>
               
               <div className="flex-1 overflow-y-auto custom-scrollbar py-6 text-[12px] font-bold text-[#111412] uppercase tracking-widest">
-                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('All'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> হোম</div>
-                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('⚡ ফ্লাশ সেল'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> ফ্লাশ সেল</div>
-                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('নতুন কালেকশন'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> নতুন কালেকশন</div>
-                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('এক্সক্লুসিভ'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> এক্সক্লুসিভ</div>
-                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('সকল ব্র্যান্ড'); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> সকল ব্র্যান্ড</div>
+                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('All'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> হোম</div>
+                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('⚡ ফ্লাশ সেল'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> ফ্লাশ সেল</div>
+                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('নতুন কালেকশন'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> নতুন কালেকশন</div>
+                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('এক্সক্লুসিভ'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> এক্সক্লুসিভ</div>
+                 <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('সকল ব্র্যান্ড'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> সকল ব্র্যান্ড</div>
                  
                  <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
                  <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black flex items-center gap-2 mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>ক্যাটাগরি সমূহ</div>
                  {dynamicSidebarCategories.filter(cat => !specialCategories.includes(cat)).map((cat, i) => (
-                   <div key={i} className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#111412]" onClick={() => {setActiveCategory(cat); setIsSidebarOpen(false); window.scrollTo(0,0);}}>
+                   <div key={i} className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#111412]" onClick={() => {setActiveCategory(cat); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}>
                      <span className="text-[10px] text-[#D4AF37]">▶</span> {cat}
                    </div>
                  ))}
@@ -1174,13 +1222,13 @@ export default function Home() {
         {viewingProduct && (() => {
           const viewingDiscount = viewingProduct.original_price ? calculateDiscount(viewingProduct.original_price, viewingProduct.price) : 0;
           return (
-          <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto z-[1000]" onClick={() => setViewingProduct(null)}>
+          <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto z-[1000]" onClick={closeProductModal}>
             <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden pb-16 md:pb-0" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-4 md:px-8 md:py-5 shadow-sm sticky top-0 z-30">
-                 <button onClick={() => setViewingProduct(null)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white px-5 py-2.5 rounded-sm shadow-sm">
+                 <button onClick={closeProductModal} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white px-5 py-2.5 rounded-sm shadow-sm">
                     <span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান
                  </button>
-                 <button onClick={() => setViewingProduct(null)} className="text-[#111412] hover:text-red-600 text-3xl font-light transition-colors">✕</button>
+                 <button onClick={closeProductModal} className="text-[#111412] hover:text-red-600 text-3xl font-light transition-colors">✕</button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-[#FAF5EB] relative">
@@ -1408,7 +1456,6 @@ export default function Home() {
               <button onClick={() => setIsCartOpen(false)} className="absolute top-6 right-6 text-3xl text-gray-400 hover:text-[#111412] transition-colors leading-none">✕</button>
               <h3 className="text-xl font-bold mb-6 border-b border-[#EADFC8] pb-5 text-[#B8860B] tracking-[0.2em] uppercase">শপিং ব্যাগ</h3>
               
-              {/* CART GAMIFICATION BAR */}
               {storeSettings.free_delivery_threshold > 0 && cart.length > 0 && (
                 <div className="mb-4 bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm">
                    {isFreeDelivery ? (
@@ -1877,7 +1924,6 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Ordered Products List Section */}
                         {order.items && order.items.length > 0 && (
                           <div className="mt-6 bg-white p-6 rounded-sm border border-[#EADFC8] shadow-sm">
                             <p className="text-[10px] text-[#B8860B] mb-4 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">অর্ডারকৃত প্রোডাক্টসমূহ</p>
@@ -1910,7 +1956,6 @@ export default function Home() {
 
                 {adminTab === 'products' && (
                   <div>
-                    {/* BULK CATEGORY PRICE UPDATE SECTION */}
                     <div className="mb-8 bg-[#FAF5EB] p-6 border border-[#EADFC8] rounded-sm shadow-sm">
                       <h3 className="font-bold text-sm text-[#111412] tracking-[0.2em] uppercase mb-5 border-b border-[#D4AF37]/30 pb-3">Bulk Category Price & Offer Update</h3>
                       <form onSubmit={handleBulkPriceUpdate} className="flex flex-col md:flex-row gap-4 items-end">
@@ -2057,7 +2102,6 @@ export default function Home() {
                   <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-[0.2em] uppercase">Add a sub-category to filter products inside the main category.</p>
                 </div>
 
-                {/* UPDATED: Description Input with HTML Hint */}
                 <div>
                   <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description (HTML Support Available)</label>
                   <textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea>
