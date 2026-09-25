@@ -522,14 +522,31 @@ export default function Home() {
     setIsCheckingOut(true);
     try {
       const orderData: any = { 
-        customer_name: customerName, customer_phone: customerPhone, 
+        customer_name: customerName, 
+        customer_phone: customerPhone, 
         customer_address: customerAddress + ` [Shipping: ${shippingLocation === 'inside' ? 'Inside Dhaka' : 'Outside Dhaka'}]`, 
-        total_amount: cartTotal, payment_method: payMethodType, items: cart, status: 'PENDING', shipping_charge: actualShippingFee 
+        total_amount: cartTotal, 
+        payment_method: payMethodType, 
+        items: cart, 
+        status: 'PENDING', 
+        shipping_charge: actualShippingFee 
       };
       if (user && user.id) orderData.user_id = user.id;
 
       const { data, error } = await supabase.from('orders').insert([orderData]).select(); 
       if (error) throw error;
+
+      const createdOrderId = data && data[0] ? data[0].id : 'ORD_' + Date.now();
+      if (typeof window !== 'undefined' && (window as any).fbq) {
+        (window as any).fbq('track', 'Purchase', {
+          value: cartTotal,
+          currency: 'BDT',
+          content_name: 'Zeenat Mart Order',
+          content_type: 'product',
+          num_items: totalItemsCount
+        }, { eventID: createdOrderId }); 
+      }
+
       if (user && user.id) fetchUserOrders(user.id);
       
       setCart([]); setIsCheckoutOpen(false); setIsCartOpen(false); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setTransactionId(''); 
