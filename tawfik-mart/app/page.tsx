@@ -23,6 +23,7 @@ interface Product {
 
 interface CartItem extends Product { 
   quantity: number; 
+  selected_size?: string;
 }
 
 interface Order {
@@ -37,6 +38,8 @@ interface Order {
   created_at: string; 
   shipping_charge?: number; 
   items?: CartItem[];
+  ip_address?: string;
+  location?: string;
 }
 
 interface Review {
@@ -87,7 +90,10 @@ export default function Home() {
 
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [selectedSize, setSelectedSize] = useState('Free Size');
   const [activeImage, setActiveImage] = useState<string>(''); 
+  const [liveVisitors, setLiveVisitors] = useState(14);
+  const [stockLeft, setStockLeft] = useState(3);
   
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -133,7 +139,7 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(false); 
 
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
-  const [adminTab, setAdminTab] = useState<'settings' | 'products' | 'orders' | 'customers'>('settings');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'settings' | 'products' | 'orders' | 'customers'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -193,7 +199,8 @@ export default function Home() {
       { title: "", subtitle: "", imageUrl: "" }, { title: "", subtitle: "", imageUrl: "" },
       { title: "", subtitle: "", imageUrl: "" }, { title: "", subtitle: "", imageUrl: "" }, { title: "", subtitle: "", imageUrl: "" }
     ],
-    category_banners: {} as any
+    category_banners: {} as any,
+    blocklist: [] as string[]
   });
   
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -210,6 +217,9 @@ export default function Home() {
     setViewingProduct(product);
     setActiveImage(product.image_url || '');
     setSelectedQuantity(1);
+    setSelectedSize('Free Size');
+    setLiveVisitors(Math.floor(Math.random() * 25) + 5);
+    setStockLeft(Math.floor(Math.random() * 8) + 2);
     if (typeof window !== "undefined") {
       const newUrl = `${window.location.pathname}?product=${product.id}`;
       window.history.pushState({ productId: product.id }, '', newUrl);
@@ -377,7 +387,7 @@ export default function Home() {
         if (!loadedSections || !Array.isArray(loadedSections)) {
             loadedSections = [];
             Object.keys(safeCatBanners).forEach(key => {
-                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT', 'CATEGORY_ORDER', 'FREE_DELIVERY_THRESHOLD'].includes(key)) {
+                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT', 'CATEGORY_ORDER', 'FREE_DELIVERY_THRESHOLD', 'BLOCKLIST'].includes(key)) {
                     loadedSections.push({ id: Date.now().toString() + Math.random(), title: key, fontSize: 36, imageUrl: safeCatBanners[key], color: '#B8860B', imageHeight: 300 });
                 }
             });
@@ -405,6 +415,7 @@ export default function Home() {
           brand_name_color: safeCatBanners['BRAND_NAME_COLOR'] || '#B8860B',
           heading_color: safeCatBanners['HEADING_COLOR'] || '#B8860B',
           page_text_color: safeCatBanners['PAGE_TEXT_COLOR'] || '#374151',
+          blocklist: safeCatBanners['BLOCKLIST'] || []
         }));
       }
     } catch(err) {}
@@ -435,25 +446,61 @@ export default function Home() {
     } catch (error) {}
   };
 
-  useEffect(() => { if(showAdminDashboard && adminTab === 'orders') fetchOrders(); }, [showAdminDashboard, adminTab]);
-  useEffect(() => { if(showAdminDashboard && adminTab === 'customers') fetchOrders(); }, [showAdminDashboard, adminTab]);
+  useEffect(() => { if(showAdminDashboard && ['dashboard', 'orders', 'customers'].includes(adminTab)) fetchOrders(); }, [showAdminDashboard, adminTab]);
 
   const uniqueCustomers = useMemo(() => {
-    const customerMap: Record<string, { name: string, phone: string, address: string, orderCount: number, totalSpent: number, lastOrder: string }> = {};
+    const customerMap: Record<string, { name: string, phone: string, address: string, orderCount: number, totalSpent: number, lastOrder: string, cancelledCount: number }> = {};
     orders.forEach(order => {
        const key = order.customer_phone;
        if (!key) return;
        if (!customerMap[key]) {
-           customerMap[key] = { name: order.customer_name, phone: order.customer_phone, address: order.customer_address, orderCount: 0, totalSpent: 0, lastOrder: order.created_at };
+           customerMap[key] = { name: order.customer_name, phone: order.customer_phone, address: order.customer_address, orderCount: 0, totalSpent: 0, lastOrder: order.created_at, cancelledCount: 0 };
        }
        customerMap[key].orderCount += 1;
-       customerMap[key].totalSpent += Number(order.total_amount) || 0;
+       if(order.status === 'DELIVERED') customerMap[key].totalSpent += Number(order.total_amount) || 0;
+       if(order.status === 'CANCELLED') customerMap[key].cancelledCount += 1;
        if (new Date(order.created_at) > new Date(customerMap[key].lastOrder)) {
            customerMap[key].lastOrder = order.created_at;
        }
     });
     return Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
   }, [orders]);
+
+  // Fraud Logic
+  const getFraudBadge = (phone: string, ip?: string) => {
+    const userOrders = orders.filter(o => o.customer_phone === phone || (ip && o.ip_address === ip));
+    const total = userOrders.length;
+    if (total === 0) return { label: '🟡 New Customer', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
+    const delivered = userOrders.filter(o => o.status === 'DELIVERED').length;
+    const cancelled = userOrders.filter(o => o.status === 'CANCELLED').length;
+    
+    if (cancelled > 0 && (cancelled / total) >= 0.5) return { label: '🔴 High Risk / Fraud Alert', color: 'bg-red-100 text-red-800 border-red-300' };
+    if (delivered >= 3 && cancelled === 0) return { label: '🟢 Safe Buyer', color: 'bg-green-100 text-green-800 border-green-300' };
+    if (total === 1) return { label: '🟡 New Customer', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
+    return { label: '🔵 Regular Buyer', color: 'bg-blue-100 text-blue-800 border-blue-300' };
+  };
+
+  const toggleBlockCustomer = async (phone: string) => {
+     const currentList = storeSettings.blocklist || [];
+     const newList = currentList.includes(phone) ? currentList.filter(p => p !== phone) : [...currentList, phone];
+     
+     const newCatBanners = { ...storeSettings.category_banners, BLOCKLIST: newList };
+     try {
+       await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+       setStoreSettings(prev => ({ ...prev, blocklist: newList, category_banners: newCatBanners }));
+       showToast(currentList.includes(phone) ? "Customer unblocked!" : "Customer blocked successfully!", "success");
+     } catch (e) { showToast("Failed to update blocklist", "error"); }
+  };
+
+  const exportOrdersCSV = () => {
+     const headers = "Order ID,Customer Name,Phone,Address,Amount,Payment,Status,Items\n";
+     const rows = orders.map(o => `"${o.id}","${o.customer_name}","${o.customer_phone}","${o.customer_address.replace(/"/g, '""')}","${o.total_amount}","${o.payment_method}","${o.status}","${(o.items||[]).map(i=>`${i.name} (Qty: ${i.quantity}, Size: ${i.selected_size||'N/A'})`).join('; ')}"`).join('\n');
+     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+     const url = URL.createObjectURL(blob);
+     const link = document.createElement('a');
+     link.href = url; link.setAttribute('download', 'orders_export.csv');
+     document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
 
   const formatPrice = (price?: string) => price ? (price.toString().includes('৳') ? price : `${price}`) : '';
   
@@ -475,11 +522,11 @@ export default function Home() {
      setTimeout(() => setAnimateCart(false), 300);
   };
 
-  const addToCart = (product: Product, qty: number = 1) => {
+  const addToCart = (product: Product, qty: number = 1, size: string = 'Free Size') => {
     if(!product.in_stock) return showToast("দুঃখিত, এই প্রোডাক্টটি বর্তমানে স্টকে নেই!", "error");
-    const existing = cart.find(item => item.id === product.id);
-    if (existing) setCart(cart.map(item => item.id === product.id ? { ...item, quantity: item.quantity + qty } : item));
-    else setCart([...cart, { ...product, quantity: qty }]);
+    const existing = cart.find(item => item.id === product.id && item.selected_size === size);
+    if (existing) setCart(cart.map(item => item.id === product.id && item.selected_size === size ? { ...item, quantity: item.quantity + qty } : item));
+    else setCart([...cart, { ...product, quantity: qty, selected_size: size }]);
     showToast("প্রোডাক্টটি ব্যাগে যোগ করা হয়েছে!", "success");
     triggerCartAnimation();
   };
@@ -497,8 +544,8 @@ export default function Home() {
 
   const handleDirectOrder = (product: Product, qty: number = 1, e?: React.MouseEvent) => {
     if(e) e.stopPropagation(); if(!product.in_stock) return showToast("দুঃখিত, এই প্রোডাক্টটি বর্তমানে স্টকে নেই!", "error");
-    const existing = cart.find(item => item.id === product.id);
-    if (!existing) setCart([...cart, { ...product, quantity: qty }]);
+    const existing = cart.find(item => item.id === product.id && item.selected_size === selectedSize);
+    if (!existing) setCart([...cart, { ...product, quantity: qty, selected_size: selectedSize }]);
     closeProductModal(); setIsCartOpen(false); setIsCheckoutOpen(true); 
   };
 
@@ -513,13 +560,35 @@ export default function Home() {
   const totalItemsCount = cart.reduce((total, item) => total + item.quantity, 0);
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); if(cart.length === 0) return showToast("আপনার ব্যাগ খালি!", "error");
+    e.preventDefault(); 
+    if(isCheckingOut) return; 
+    if(cart.length === 0) return showToast("আপনার ব্যাগ খালি!", "error");
+
+    const phoneRegex = /^01[3-9]\d{8}$/;
+    if (!phoneRegex.test(customerPhone)) {
+      return showToast("দয়া করে সঠিক বাংলাদেশী ১১-ডিজিটের মোবাইল নম্বর দিন (যেমন: 017...)", "error");
+    }
+
+    if (storeSettings.blocklist?.includes(customerPhone)) {
+      return showToast("দুঃখিত, আপনার অ্যাকাউন্টটি ব্লকলিস্টে আছে। অর্ডার করা সম্ভব নয়।", "error");
+    }
+
     const finalPaymentMethodText = paymentMethod === 'COD' ? 'Cash on Delivery' : `${paymentMethod} (TrxID: ${transactionId})`;
     await processOrderExecution(finalPaymentMethodText);
   };
 
   const processOrderExecution = async (payMethodType: string) => {
     setIsCheckingOut(true);
+    let userIp = 'Unknown';
+    let userLocation = 'Unknown';
+
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      const ipData = await res.json();
+      userIp = ipData.ip || 'Unknown';
+      userLocation = `${ipData.city || ''}, ${ipData.region || ''}, ${ipData.org || ''}`;
+    } catch(err) { console.log("IP Fetch failed"); }
+
     try {
       const orderData: any = { 
         customer_name: customerName, 
@@ -529,7 +598,9 @@ export default function Home() {
         payment_method: payMethodType, 
         items: cart, 
         status: 'PENDING', 
-        shipping_charge: actualShippingFee 
+        shipping_charge: actualShippingFee,
+        ip_address: userIp,
+        location: userLocation
       };
       if (user && user.id) orderData.user_id = user.id;
 
@@ -698,7 +769,8 @@ export default function Home() {
          'FB_PAGE_URL': storeSettings.fb_page_url,
          'DEFAULT_SORT': storeSettings.default_sort,
          'CATEGORY_ORDER': storeSettings.category_order,
-         'FREE_DELIVERY_THRESHOLD': storeSettings.free_delivery_threshold
+         'FREE_DELIVERY_THRESHOLD': storeSettings.free_delivery_threshold,
+         'BLOCKLIST': storeSettings.blocklist
       };
       const { error } = await supabase.from('store_settings').update({ shop_name: storeSettings.shop_name, phone: storeSettings.phone, category_banners: newCatBanners }).eq('id', 1);
       if(error) throw error; 
@@ -1132,7 +1204,7 @@ export default function Home() {
             </div>
             <div className="flex gap-3">
                <button onClick={openAddModal} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">+ Add</button>
-               <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.2em] uppercase">⚙️ Settings</button>
+               <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.2em] uppercase">⚙ Dashboard</button>
             </div>
           </div>
         )}
@@ -1280,8 +1352,24 @@ export default function Home() {
 
                      <div className="flex flex-col gap-2 mb-6 text-xs text-gray-600 font-bold tracking-wide">
                         <p className="flex items-center gap-2"><span className="text-base">🎁</span> প্রোডাক্ট আইডি: {viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}</p>
-                        <p className="flex items-center gap-2"><span className="text-base">👁️</span> ভিউ হয়েছে: {getProductViews(viewingProduct.id)}</p>
-                        {viewingProduct.in_stock !== false && <p className="flex items-center gap-2 text-green-600"><span className="text-base">✅</span> স্টকে আছে</p>}
+                        <p className="flex items-center gap-2 text-red-500 animate-pulse"><span className="text-base">🔥</span> {liveVisitors} জন এই মুহূর্তে প্রোডাক্টটি দেখছেন</p>
+                        {viewingProduct.in_stock !== false ? (
+                           <p className="flex items-center gap-2 text-[#B8860B]"><span className="text-base">⚡</span> মাত্র {stockLeft} টি স্টকে অবশিষ্ট আছে!</p>
+                        ) : (
+                           <p className="flex items-center gap-2 text-red-600"><span className="text-base">❌</span> স্টক আউট</p>
+                        )}
+                     </div>
+
+                     {/* Product Variant Selector */}
+                     <div className="mb-6 border-t border-b border-[#EADFC8] py-4">
+                        <p className="text-[10px] font-bold text-[#B8860B] uppercase tracking-[0.2em] mb-3">সিলেক্ট সাইজ:</p>
+                        <div className="flex flex-wrap gap-3">
+                           {['Free Size', '52', '54', '56'].map(size => (
+                              <button key={size} onClick={() => setSelectedSize(size)} className={`px-4 py-2 border text-[11px] font-bold uppercase tracking-widest rounded-sm transition-colors shadow-sm ${selectedSize === size ? 'bg-[#111412] text-[#D4AF37] border-[#D4AF37]' : 'bg-white text-[#111412] border-[#EADFC8] hover:border-[#D4AF37]'}`}>
+                                 {size}
+                              </button>
+                           ))}
+                        </div>
                      </div>
 
                      {/* Dynamic Gamified Free Delivery Badge */}
@@ -1305,12 +1393,12 @@ export default function Home() {
                          <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={!viewingProduct.in_stock} className="w-full bg-[#111412] text-white font-bold py-4 rounded-sm hover:bg-[#333] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-md">
                            ⚡ সরাসরি অর্ডার করুন
                          </button>
-                         <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); }} disabled={!viewingProduct.in_stock} className="w-full bg-[#2a2a2a] text-white font-bold py-4 rounded-sm hover:bg-[#444] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
+                         <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1, selectedSize); }} disabled={!viewingProduct.in_stock} className="w-full bg-[#2a2a2a] text-white font-bold py-4 rounded-sm hover:bg-[#444] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm">
                            🛒 ব্যাগে যোগ করুন
                          </button>
                          
                          {/* WhatsApp Order Feature */}
-                         <a href={`https://wa.me/88${storeSettings.phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম, আমি এই প্রোডাক্টটি নিতে চাই:\n\nনাম: ${viewingProduct.name}\nদাম: ৳${viewingProduct.price}\nআইডি: ${viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm uppercase">
+                         <a href={`https://wa.me/88${storeSettings.phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম, আমি এই প্রোডাক্টটি নিতে চাই:\n\nনাম: ${viewingProduct.name}\nসাইজ: ${selectedSize}\nদাম: ৳${viewingProduct.price}\nআইডি: ${viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm uppercase">
                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z"/></svg>
                            হোয়াটসঅ্যাপে অর্ডার
                          </a>
@@ -1366,7 +1454,7 @@ export default function Home() {
               
               {/* Sticky Bottom Bar for Mobile Only within Modal */}
               <div className="md:hidden absolute bottom-0 left-0 w-full bg-white border-t border-[#EADFC8] p-3 shadow-[0_-5px_15px_rgba(0,0,0,0.1)] flex gap-3 z-50 animate-slide-up">
-                 <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); }} disabled={!viewingProduct.in_stock} className="flex-1 bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[11px] font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 uppercase tracking-widest shadow-sm">🛒 ব্যাগে যোগ</button>
+                 <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1, selectedSize); }} disabled={!viewingProduct.in_stock} className="flex-1 bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[11px] font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 uppercase tracking-widest shadow-sm">🛒 ব্যাগে যোগ</button>
                  <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={!viewingProduct.in_stock} className="flex-1 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[11px] font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 uppercase tracking-widest shadow-md">⚡ অর্ডার করুন</button>
               </div>
             </div>
@@ -1390,8 +1478,8 @@ export default function Home() {
                     <input required value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">📱 মোবাইল নাম্বার <span className="text-red-500">*</span></label>
-                    <input required placeholder="01xxxxxxxxx" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+                    <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">📱 মোবাইল নাম্বার (01XXXXXXXXX) <span className="text-red-500">*</span></label>
+                    <input required placeholder="017xxxxxxxx" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">🏠 ডেলিভারি ঠিকানা <span className="text-red-500">*</span></label>
@@ -1428,13 +1516,14 @@ export default function Home() {
                   </div>
 
                   <div className="border border-[#EADFC8] bg-white rounded-sm mt-6 overflow-hidden shadow-sm">
-                     {cart.map((item) => (
-                       <div key={item.id} className="flex border-b border-[#EADFC8] last:border-0 p-3 items-center text-sm">
+                     {cart.map((item, index) => (
+                       <div key={`${item.id}-${index}`} className="flex border-b border-[#EADFC8] last:border-0 p-3 items-center text-sm">
                           <div className="w-16 h-16 border border-[#EADFC8] mr-4 shrink-0 rounded-sm overflow-hidden bg-[#FAF5EB]">
                              <img src={item.image_url||''} loading="lazy" className="w-full h-full object-cover"/>
                           </div>
                           <div className="flex-1 leading-tight">
                              <p className="font-bold text-[#111412] text-[13px] line-clamp-1">{item.name}</p>
+                             <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-widest">Size: {item.selected_size}</p>
                              <p className="text-[11px] text-[#B8860B] font-black mt-1.5">৳ {formatPrice(item.price)} X {item.quantity}</p>
                           </div>
                           <div className="flex flex-col items-center border-l border-r border-[#EADFC8] px-3 h-full justify-center gap-2 bg-[#FAF5EB]">
@@ -1489,11 +1578,15 @@ export default function Home() {
               )}
 
               <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 mt-2">
-                {cart.map(item => (
-                  <div key={item.id} className="flex items-center justify-between bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
+                {cart.map((item, index) => (
+                  <div key={`${item.id}-${index}`} className="flex items-center justify-between bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
                     <div className="flex gap-4 items-center w-2/3">
                       <img src={item.image_url||''} loading="lazy" className="w-16 h-16 border border-[#EADFC8] bg-white rounded-sm object-cover shrink-0"/>
-                      <div><p className="text-[12px] font-bold text-[#111412] leading-tight line-clamp-2">{item.name}</p><p className="text-[11px] font-black mt-2 text-[#B8860B]">{formatPrice(item.price)} x {item.quantity}</p></div>
+                      <div>
+                        <p className="text-[12px] font-bold text-[#111412] leading-tight line-clamp-2">{item.name}</p>
+                        <p className="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-widest">Size: {item.selected_size}</p>
+                        <p className="text-[11px] font-black mt-2 text-[#B8860B]">{formatPrice(item.price)} x {item.quantity}</p>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-3">
                         <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-[9px] font-bold hover:underline uppercase tracking-wider">Remove</button>
@@ -1656,13 +1749,46 @@ export default function Home() {
               </div>
 
               <div className="flex border-b border-[#EADFC8] bg-white overflow-x-auto custom-scrollbar">
-                <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Store Settings</button>
+                <button onClick={() => setAdminTab('dashboard')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'dashboard' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>📊 Dashboard</button>
+                <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Settings</button>
                 <button onClick={() => setAdminTab('orders')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'orders' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>📦 Orders</button>
                 <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Product List</button>
                 <button onClick={() => setAdminTab('customers')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'customers' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>👥 Customers</button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white custom-scrollbar">
+                
+                {adminTab === 'dashboard' && (() => {
+                  const deliveredOrders = orders.filter(o => o.status === 'DELIVERED');
+                  const pendingOrders = orders.filter(o => o.status === 'PENDING');
+                  const cancelledOrders = orders.filter(o => o.status === 'CANCELLED');
+                  const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+
+                  return (
+                    <div className="space-y-8">
+                       <h3 className="font-bold text-xl mb-4 text-[#111412] tracking-[0.2em] uppercase">Summary Overview</h3>
+                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                          <div className="bg-gradient-to-br from-[#111412] to-[#2a2a2a] p-6 rounded-md shadow-lg border border-[#D4AF37]">
+                             <p className="text-[10px] text-[#D4AF37] font-bold uppercase tracking-widest mb-2">Total Revenue (Delivered)</p>
+                             <p className="text-3xl font-black text-white">৳ {totalRevenue.toLocaleString()}</p>
+                          </div>
+                          <div className="bg-white p-6 rounded-md shadow-md border border-[#EADFC8]">
+                             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Pending Orders</p>
+                             <p className="text-3xl font-black text-yellow-600">{pendingOrders.length}</p>
+                          </div>
+                          <div className="bg-white p-6 rounded-md shadow-md border border-[#EADFC8]">
+                             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Delivered Orders</p>
+                             <p className="text-3xl font-black text-green-600">{deliveredOrders.length}</p>
+                          </div>
+                          <div className="bg-white p-6 rounded-md shadow-md border border-[#EADFC8]">
+                             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">High Risk / Cancelled</p>
+                             <p className="text-3xl font-black text-red-600">{cancelledOrders.length}</p>
+                          </div>
+                       </div>
+                    </div>
+                  );
+                })()}
+
                 {adminTab === 'settings' && (
                   <div className="space-y-10">
                     <form onSubmit={handleSaveSettings} className="bg-[#FAF5EB] p-8 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm">
@@ -1909,65 +2035,110 @@ export default function Home() {
 
                 {adminTab === 'orders' && (
                   <div className="space-y-6">
-                    {orders.length === 0 ? <p className="text-center py-16 text-gray-500 font-bold border-2 border-dashed border-[#D4AF37]/50 rounded-sm bg-[#FAF5EB] tracking-[0.2em] uppercase text-xs">No orders found.</p> : orders.map(order => (
-                      <div key={order.id} className="bg-[#FAF5EB] p-6 md:p-8 border border-[#EADFC8] rounded-sm shadow-sm hover:border-[#D4AF37] transition-colors">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-[#D4AF37]/30 pb-5 mb-6 gap-5">
-                          <div>
-                             <p className="font-black text-lg text-[#111412] uppercase tracking-wider">Order #{order.id.split('-')[0]}</p>
-                             <div className="flex items-center gap-4 mt-3">
-                               <p className="text-[10px] text-gray-500 font-bold tracking-[0.2em] uppercase bg-white px-3 py-1.5 rounded-sm border border-[#EADFC8]">{new Date(order.created_at).toLocaleString()}</p>
-                               <p className={`text-[10px] font-black px-3 py-1.5 rounded-sm uppercase tracking-wider border ${getStatusColor(order.status)}`}>{order.payment_method}</p>
-                             </div>
+                    <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-sm border border-[#EADFC8] shadow-sm">
+                       <h3 className="font-bold text-[#111412] tracking-[0.2em] uppercase">All Orders ({orders.length})</h3>
+                       <button onClick={exportOrdersCSV} className="bg-[#111412] text-[#D4AF37] px-6 py-2.5 text-[11px] font-bold rounded-sm shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors uppercase tracking-widest border border-[#D4AF37]">
+                          ⬇ Export All to Excel
+                       </button>
+                    </div>
+                    
+                    {orders.length === 0 ? <p className="text-center py-16 text-gray-500 font-bold border-2 border-dashed border-[#D4AF37]/50 rounded-sm bg-[#FAF5EB] tracking-[0.2em] uppercase text-xs">No orders found.</p> : orders.map(order => {
+                      const badge = getFraudBadge(order.customer_phone, order.ip_address);
+                      return (
+                      <div key={order.id} className="bg-white border border-[#EADFC8] rounded-sm shadow-sm hover:border-[#D4AF37] transition-colors relative flex flex-col xl:flex-row overflow-hidden">
+                        
+                        {/* LEFT SIDE: Order Details */}
+                        <div className="flex-1 p-6 md:p-8 border-b xl:border-b-0 xl:border-r border-[#EADFC8]">
+                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-[#D4AF37]/30 pb-5 mb-6 gap-5">
+                            <div>
+                               <div className="flex items-center gap-3 mb-2">
+                                 <p className="font-black text-lg text-[#111412] uppercase tracking-wider">Order #{order.id.split('-')[0]}</p>
+                                 <span className={`text-[10px] font-black px-3 py-1.5 rounded-sm uppercase tracking-wider border ${getStatusColor(order.status)}`}>{order.payment_method}</span>
+                               </div>
+                               <div className="flex items-center gap-4 mt-3">
+                                 <p className="text-[10px] text-gray-500 font-bold tracking-[0.2em] uppercase bg-[#FAF5EB] px-3 py-1.5 rounded-sm border border-[#EADFC8]">{new Date(order.created_at).toLocaleString()}</p>
+                               </div>
+                            </div>
+                            <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} className={`text-xs font-bold p-3 rounded-sm outline-none cursor-pointer shadow-sm uppercase tracking-[0.1em] border ${getStatusColor(order.status)}`}>
+                              <option value="PENDING" className="bg-white text-black">PENDING</option>
+                              <option value="CONFIRMED" className="bg-white text-black">CONFIRMED</option>
+                              <option value="PROCESSING" className="bg-white text-black">PROCESSING</option>
+                              <option value="SHIPPED" className="bg-white text-black">SHIPPED</option>
+                              <option value="DELIVERED" className="bg-white text-black">DELIVERED</option>
+                              <option value="CANCELLED" className="bg-white text-black">CANCELLED</option>
+                            </select>
                           </div>
-                          <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} className={`text-xs font-bold p-3 rounded-sm outline-none cursor-pointer shadow-sm uppercase tracking-[0.1em] border ${getStatusColor(order.status)}`}>
-                            <option value="PENDING" className="bg-white text-black">PENDING</option>
-                            <option value="CONFIRMED" className="bg-white text-black">CONFIRMED</option>
-                            <option value="PROCESSING" className="bg-white text-black">PROCESSING</option>
-                            <option value="SHIPPED" className="bg-white text-black">SHIPPED</option>
-                            <option value="DELIVERED" className="bg-white text-black">DELIVERED</option>
-                            <option value="CANCELLED" className="bg-white text-black">CANCELLED</option>
-                          </select>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+                            <div className="bg-[#FAF5EB] p-6 rounded-sm border border-[#EADFC8] shadow-sm">
+                              <p className="text-[10px] text-[#B8860B] mb-3 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Customer Details</p>
+                              <p className="font-bold text-[#111412] text-lg mb-1">{order.customer_name}</p>
+                              <p className="font-medium text-gray-600 mb-1">{order.customer_phone}</p>
+                            </div>
+                            <div className="bg-[#FAF5EB] p-6 rounded-sm border border-[#EADFC8] shadow-sm">
+                              <p className="text-[10px] text-[#B8860B] mb-3 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Shipping Info</p>
+                              <p className="line-clamp-2 font-medium text-gray-600 mb-4">{order.customer_address}</p>
+                              <p className="font-black text-[#111412] text-xl border-t border-[#EADFC8] pt-3">Total: <span className="text-[#B8860B]">৳{order.total_amount}</span></p>
+                            </div>
+                          </div>
+
+                          {order.items && order.items.length > 0 && (
+                            <div className="mt-6 bg-[#FAF5EB] p-6 rounded-sm border border-[#EADFC8] shadow-sm">
+                              <p className="text-[10px] text-[#B8860B] mb-4 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">অর্ডারকৃত প্রোডাক্টসমূহ</p>
+                              <div className="flex flex-col gap-3">
+                                {order.items.map((item, idx) => (
+                                  <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-sm border border-[#EADFC8]">
+                                     <div className="flex items-center gap-4">
+                                       {item.image_url ? (
+                                         <img src={item.image_url} className="w-12 h-12 object-cover rounded-sm border border-[#EADFC8]" />
+                                       ) : (
+                                         <div className="w-12 h-12 bg-[#FAF5EB] rounded-sm border border-[#EADFC8] flex items-center justify-center text-[8px] text-gray-400">No Img</div>
+                                       )}
+                                       <div>
+                                         <p className="font-bold text-[#111412] text-xs line-clamp-1">{item.name}</p>
+                                         <p className="text-[9px] text-[#D4AF37] font-bold mt-1 uppercase tracking-widest">ID: {item.id.split('-')[0]} | Size: {item.selected_size}</p>
+                                       </div>
+                                     </div>
+                                     <div className="text-right">
+                                       <p className="font-black text-[#B8860B] text-sm">৳{item.price} <span className="text-gray-500 text-[10px] ml-1">x {item.quantity}</span></p>
+                                     </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
-                          <div className="bg-white p-6 rounded-sm border border-[#EADFC8] shadow-sm">
-                            <p className="text-[10px] text-[#B8860B] mb-3 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Customer Details</p>
-                            <p className="font-bold text-[#111412] text-lg mb-1">{order.customer_name}</p>
-                            <p className="font-medium text-gray-600">{order.customer_phone}</p>
+
+                        {/* RIGHT SIDE: Smart Actions & Risk Profile */}
+                        <div className="w-full xl:w-[340px] bg-[#FAF5EB] p-6 md:p-8 flex flex-col gap-5 shrink-0 relative overflow-hidden">
+                          <h4 className="font-bold text-[11px] text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-3 text-center">Smart Actions & Risk</h4>
+                          
+                          {/* Fraud Badge Box */}
+                          <div className={`p-4 rounded-sm border ${badge.color} text-center shadow-sm relative overflow-hidden`}>
+                             <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-0"></div>
+                             <p className="text-xs font-black uppercase tracking-widest relative z-10">{badge.label}</p>
                           </div>
-                          <div className="bg-white p-6 rounded-sm border border-[#EADFC8] shadow-sm">
-                            <p className="text-[10px] text-[#B8860B] mb-3 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Shipping Info</p>
-                            <p className="line-clamp-2 font-medium text-gray-600 mb-4">{order.customer_address}</p>
-                            <p className="font-black text-[#111412] text-xl border-t border-[#EADFC8] pt-3">Total: <span className="text-[#B8860B]">৳{order.total_amount}</span></p>
+
+                          {/* IP Info Box */}
+                          <div className="bg-white p-4 rounded-sm border border-[#EADFC8] shadow-sm">
+                             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.2em] mb-1.5 flex items-center gap-1"><span>🌐</span> IP & Location Tracker</p>
+                             <p className="text-[11px] font-bold text-[#111412] mb-1">{order.ip_address || 'IP Not Recorded'}</p>
+                             <p className="text-[10px] text-gray-500 leading-tight">{order.location || 'Unknown Location'}</p>
+                          </div>
+
+                          {/* Buttons Box */}
+                          <div className="mt-auto pt-6 border-t border-[#EADFC8] flex flex-col gap-3">
+                             <a href={`https://wa.me/88${order.customer_phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম ${order.customer_name}, আপনার অর্ডার #${order.id.split('-')[0]} কনফার্ম করা হয়েছে। টোটাল বিল: ৳${order.total_amount}। ধন্যবাদ!`)}`} target="_blank" className="w-full bg-[#25D366] text-white text-[10px] py-4 rounded-sm font-bold uppercase tracking-[0.2em] hover:bg-[#128C7E] flex justify-center items-center gap-2 shadow-sm transition-colors border border-[#25D366]">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z"/></svg>
+                                Send Invoice
+                             </a>
+                             <button onClick={() => toggleBlockCustomer(order.customer_phone)} className={`w-full text-[10px] py-4 rounded-sm font-bold uppercase tracking-[0.2em] transition-colors shadow-sm border ${storeSettings.blocklist?.includes(order.customer_phone) ? 'bg-gray-200 text-gray-700 border-gray-400 hover:bg-gray-300' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white'}`}>
+                                {storeSettings.blocklist?.includes(order.customer_phone) ? '🔓 Unblock Customer' : '🚫 Block Customer'}
+                             </button>
                           </div>
                         </div>
 
-                        {order.items && order.items.length > 0 && (
-                          <div className="mt-6 bg-white p-6 rounded-sm border border-[#EADFC8] shadow-sm">
-                            <p className="text-[10px] text-[#B8860B] mb-4 font-black uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">অর্ডারকৃত প্রোডাক্টসমূহ</p>
-                            <div className="flex flex-col gap-3">
-                              {order.items.map((item, idx) => (
-                                <div key={idx} className="flex justify-between items-center bg-[#FAF5EB] p-3 rounded-sm border border-[#EADFC8]">
-                                   <div className="flex items-center gap-4">
-                                     {item.image_url ? (
-                                       <img src={item.image_url} className="w-12 h-12 object-cover rounded-sm border border-[#EADFC8]" />
-                                     ) : (
-                                       <div className="w-12 h-12 bg-white rounded-sm border border-[#EADFC8] flex items-center justify-center text-[8px] text-gray-400">No Img</div>
-                                     )}
-                                     <div>
-                                       <p className="font-bold text-[#111412] text-xs line-clamp-1">{item.name}</p>
-                                       <p className="text-[9px] text-[#D4AF37] font-bold mt-1 uppercase tracking-widest">ID: {item.id.split('-')[0]}</p>
-                                     </div>
-                                   </div>
-                                   <div className="text-right">
-                                     <p className="font-black text-[#B8860B] text-sm">৳{item.price} <span className="text-gray-500 text-[10px] ml-1">x {item.quantity}</span></p>
-                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
 
@@ -2032,6 +2203,7 @@ export default function Home() {
                                 <div>
                                    <p className="font-black text-lg text-[#111412]">{cust.name}</p>
                                    <p className="text-xs text-gray-500 font-bold mt-1 tracking-widest">{cust.phone}</p>
+                                   {storeSettings.blocklist?.includes(cust.phone) && <span className="text-[9px] bg-red-100 text-red-600 px-2 py-1 rounded-sm mt-2 inline-block font-bold tracking-widest uppercase">Blocked</span>}
                                 </div>
                                 <div className="bg-[#FAF5EB] border border-[#D4AF37] text-[#B8860B] px-3 py-1.5 rounded-sm flex flex-col items-center">
                                    <span className="text-[10px] font-bold uppercase tracking-widest mb-1">Orders</span>
@@ -2039,12 +2211,19 @@ export default function Home() {
                                 </div>
                              </div>
                              <p className="text-sm text-gray-600 mb-4 line-clamp-2">{cust.address}</p>
+                             <p className="text-xs font-bold text-red-500 mb-4">Cancelled: {cust.cancelledCount}</p>
+                             
                              <div className="flex justify-between items-end pt-4 border-t border-[#EADFC8]">
                                 <div>
                                    <p className="text-[9px] text-gray-400 font-bold tracking-[0.2em] uppercase mb-1">Total Spent</p>
                                    <p className="font-black text-[#B8860B] text-lg">৳{cust.totalSpent}</p>
                                 </div>
-                                <p className="text-[9px] text-[#D4AF37] font-bold tracking-[0.2em] uppercase bg-[#111412] px-2 py-1 rounded-sm">Last: {new Date(cust.lastOrder).toLocaleDateString()}</p>
+                                <div className="flex flex-col items-end gap-2">
+                                  <p className="text-[9px] text-[#D4AF37] font-bold tracking-[0.2em] uppercase bg-[#111412] px-2 py-1 rounded-sm">Last: {new Date(cust.lastOrder).toLocaleDateString()}</p>
+                                  <button onClick={() => toggleBlockCustomer(cust.phone)} className="text-[9px] border border-gray-400 px-2 py-1 rounded-sm hover:bg-gray-100 uppercase tracking-widest font-bold">
+                                    {storeSettings.blocklist?.includes(cust.phone) ? 'Unblock' : 'Block'}
+                                  </button>
+                                </div>
                              </div>
                           </div>
                        )) : (
