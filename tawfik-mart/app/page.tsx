@@ -190,7 +190,6 @@ export default function Home() {
     phone: '01632331534',
     logo_url: '',
     flashDealActive: false, 
-    endTime: Date.now() + 12 * 60 * 60 * 1000, 
     bg_enabled: true,
     bg_opacity: 70,
     font_family: 'sans-serif',
@@ -1203,11 +1202,12 @@ export default function Home() {
     setActiveSubCategories(prev => ({ ...prev, [catName]: subName })); 
   };
 
-  const specialCategories = ["⚡ ফ্লাশ সেল", "নতুন কালেকশন", "এক্সক্লুসিভ", "সকল ব্র্যান্ড"];
+  const specialCategories: string[] = []; // Removed the hardcoded dummy categories
   const allDynamicCats = products.flatMap(p => (p.category || '').split(',').map(c=>c.trim())).filter(Boolean);
   const dynamicSidebarCategories = Array.from(new Set([...customSections.map(c => c.title), ...allDynamicCats]));
   
-  const allCategoryOptions = Array.from(new Set([...specialCategories, ...dynamicSidebarCategories]));
+  // Custom Category Scrollable List now only contains Dynamic Categories
+  const allCategoryOptions = Array.from(new Set([...dynamicSidebarCategories]));
 
   const filteredProducts = products.filter(item => 
     (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -1417,7 +1417,7 @@ export default function Home() {
             <div className="hidden md:flex items-center gap-7">
               <button onClick={() => { if(user) setShowProfileModal(true); else setShowAuthModal(true); }} className="text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">👤</button>
               <button onClick={() => setIsWishlistOpen(true)} className="relative text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">
-                ❤️{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
+                ❤️️{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
               </button>
               <button onClick={() => setIsCartOpen(true)} className={`relative text-2xl text-[#111412] hover:text-[#D4AF37] transition-all duration-300 ${animateCart ? 'scale-125 text-[#B8860B]' : ''}`}>
                 🛒{cart.length > 0 && <span className="absolute -top-1 -right-3 bg-[#111412] text-[#D4AF37] text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-[#D4AF37]">{totalItemsCount}</span>}
@@ -1427,7 +1427,6 @@ export default function Home() {
 
           <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-8">
             
-            {/* Banner Section Without Timer */}
             {activeCategory === 'All' && !searchQuery && activeBanners.length > 0 && (
               <div className="w-full shadow-lg rounded-md relative overflow-hidden bg-[#FAF5EB] border border-[#EADFC8]" style={{ height: 'clamp(200px, 35vw, 450px)' }}>
                 {activeBanners.map((banner, idx) => (
@@ -2107,7 +2106,7 @@ export default function Home() {
                   <>
                     <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Product List</button>
                     <button onClick={() => setAdminTab('customers')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'customers' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>👥 Customers</button>
-                    <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Settings</button>
+                    <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️️ Settings</button>
                   </>
                 )}
               </div>
@@ -2230,7 +2229,9 @@ export default function Home() {
                         <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
                            <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">1. Website Font Style</label>
                            <select value={storeSettings.font_family} onChange={e=>setStoreSettings({...storeSettings, font_family: e.target.value})} className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner cursor-pointer" style={{fontFamily: storeSettings.font_family}}>
-                             {fontOptions.map((font, idx) => ( <option key={idx} value={font.value} style={{fontFamily: font.value}}>{font.name}</option> ))}
+                             {fontOptions.map((font, idx) => ( 
+                               <option key={idx} value={font.value} style={{fontFamily: font.value}}>{font.name}</option> 
+                             ))}
                            </select>
                         </div>
                         <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
@@ -2262,10 +2263,16 @@ export default function Home() {
                           <div className="flex items-center gap-6">
                             <div className="w-24 h-24 bg-[#111412] border-2 border-[#D4AF37] shadow-[0_0_10px_rgba(212,175,55,0.4)] rounded-full flex items-center justify-center overflow-hidden shrink-0 relative group">
                               {storeSettings.logo_url ? (
-                                <><img src={storeSettings.logo_url} className="w-full h-full object-cover"/><button type="button" onClick={() => handleRemoveImage('logo')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button></>
+                                <>
+                                  <img src={storeSettings.logo_url} className="w-full h-full object-cover"/>
+                                  <button type="button" onClick={() => handleRemoveImage('logo')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button>
+                                </>
                               ) : <span className="text-[10px] text-[#D4AF37] font-bold uppercase tracking-wider text-center">No Logo</span>}
                             </div>
-                            <div className="flex-1"><input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'logo')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>{uploadingType === 'logo' && <span className="text-[10px] text-[#B8860B] block mt-3 font-black tracking-[0.2em] uppercase">Uploading...</span>}</div>
+                            <div className="flex-1">
+                              <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'logo')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>
+                              {uploadingType === 'logo' && <span className="text-[10px] text-[#B8860B] block mt-3 font-black tracking-[0.2em] uppercase">Uploading...</span>}
+                            </div>
                           </div>
                         </div>
 
@@ -2274,14 +2281,25 @@ export default function Home() {
                           <div className="flex items-center gap-6">
                             <div className="w-32 h-24 bg-[#FAF5EB] border border-[#D4AF37] shadow-sm rounded-sm flex items-center justify-center overflow-hidden shrink-0 relative group">
                               {storeSettings.category_banners?.['WEBSITE_BG'] ? (
-                                <><img src={storeSettings.category_banners['WEBSITE_BG']} className="w-full h-full object-cover"/><button type="button" onClick={() => handleRemoveImage('website_bg')} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 flex items-center justify-center rounded-sm text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button></>
+                                <>
+                                  <img src={storeSettings.category_banners['WEBSITE_BG']} className="w-full h-full object-cover"/>
+                                  <button type="button" onClick={() => handleRemoveImage('website_bg')} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 flex items-center justify-center rounded-sm text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button>
+                                </>
                               ) : <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider text-center">No BG</span>}
                             </div>
                             <div className="flex-1 flex flex-col gap-3">
-                              <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'website_bg')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>{uploadingType === 'website_bg' && <span className="text-[10px] text-[#B8860B] block font-black tracking-[0.2em] uppercase">Uploading...</span>}
+                              <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'website_bg')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>
+                              {uploadingType === 'website_bg' && <span className="text-[10px] text-[#B8860B] block font-black tracking-[0.2em] uppercase">Uploading...</span>}
+                              
                               <div className="flex items-center gap-4 mt-2 bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm">
-                                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={storeSettings.bg_enabled} onChange={e=>setStoreSettings({...storeSettings, bg_enabled: e.target.checked})} className="w-4 h-4 accent-[#D4AF37] cursor-pointer"/><span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Show</span></label>
-                                <div className="flex items-center gap-2 flex-1"><span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Opacity: {storeSettings.bg_opacity}%</span><input type="range" min="0" max="100" value={storeSettings.bg_opacity} onChange={e=>setStoreSettings({...storeSettings, bg_opacity: Number(e.target.value)})} className="w-full accent-[#D4AF37] cursor-pointer"/></div>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input type="checkbox" checked={storeSettings.bg_enabled} onChange={e=>setStoreSettings({...storeSettings, bg_enabled: e.target.checked})} className="w-4 h-4 accent-[#D4AF37] cursor-pointer"/>
+                                  <span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Show</span>
+                                </label>
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Opacity: {storeSettings.bg_opacity}%</span>
+                                  <input type="range" min="0" max="100" value={storeSettings.bg_opacity} onChange={e=>setStoreSettings({...storeSettings, bg_opacity: Number(e.target.value)})} className="w-full accent-[#D4AF37] cursor-pointer"/>
+                                </div>
                               </div>
                             </div>
                           </div>
