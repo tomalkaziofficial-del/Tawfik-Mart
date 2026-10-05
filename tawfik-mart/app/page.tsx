@@ -189,7 +189,8 @@ export default function Home() {
     shop_name: 'Zeenat Mart', 
     phone: '01632331534',
     logo_url: '',
-    flashDealActive: false, 
+    flashDealActive: false,
+    endTime: Date.now() + 12 * 60 * 60 * 1000,
     bg_enabled: true,
     bg_opacity: 70,
     font_family: 'sans-serif',
@@ -1202,7 +1203,8 @@ export default function Home() {
     setActiveSubCategories(prev => ({ ...prev, [catName]: subName })); 
   };
 
-  const specialCategories: string[] = []; // Removed the hardcoded dummy categories
+  // DUMMY CATEGORIES REMOVED COMPLETELY
+  const specialCategories: string[] = []; 
   const allDynamicCats = products.flatMap(p => (p.category || '').split(',').map(c=>c.trim())).filter(Boolean);
   const dynamicSidebarCategories = Array.from(new Set([...customSections.map(c => c.title), ...allDynamicCats]));
   
@@ -1417,7 +1419,7 @@ export default function Home() {
             <div className="hidden md:flex items-center gap-7">
               <button onClick={() => { if(user) setShowProfileModal(true); else setShowAuthModal(true); }} className="text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">👤</button>
               <button onClick={() => setIsWishlistOpen(true)} className="relative text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">
-                ❤️️{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
+                ❤{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
               </button>
               <button onClick={() => setIsCartOpen(true)} className={`relative text-2xl text-[#111412] hover:text-[#D4AF37] transition-all duration-300 ${animateCart ? 'scale-125 text-[#B8860B]' : ''}`}>
                 🛒{cart.length > 0 && <span className="absolute -top-1 -right-3 bg-[#111412] text-[#D4AF37] text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-[#D4AF37]">{totalItemsCount}</span>}
@@ -1427,6 +1429,7 @@ export default function Home() {
 
           <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-8">
             
+            {/* Banner Section Without Timer */}
             {activeCategory === 'All' && !searchQuery && activeBanners.length > 0 && (
               <div className="w-full shadow-lg rounded-md relative overflow-hidden bg-[#FAF5EB] border border-[#EADFC8]" style={{ height: 'clamp(200px, 35vw, 450px)' }}>
                 {activeBanners.map((banner, idx) => (
@@ -1611,10 +1614,56 @@ export default function Home() {
         )}
       </main>
 
-      <div style={{ position: 'relative', zIndex: 99999 }}>
+      {/* Sidebar Modal Section (FIXED z-index) */}
+      {isSidebarOpen && (
+        <div style={{ position: 'relative', zIndex: 999999 }}>
+          <div className="fixed inset-0 bg-[#111412]/60 backdrop-blur-sm transition-opacity z-[999998]" onClick={() => setIsSidebarOpen(false)}></div>
+          <div className="fixed top-0 left-0 w-[280px] md:w-[320px] h-full bg-[#FAF5EB] shadow-[5px_0_30px_rgba(0,0,0,0.5)] flex flex-col transform transition-transform duration-300 border-r border-[#D4AF37]/50 z-[999999]">
+            <div className="p-5 flex justify-between items-center bg-[#111412] text-[#D4AF37] shadow-sm border-b border-[#D4AF37]/30">
+              <div className="flex items-center gap-3">
+                 <div className="relative flex items-center justify-center p-1">
+                   <div className="absolute inset-0 rounded-full border-l-[2px] border-b-[2px] border-[#D4AF37] shadow-[-2px_2px_5px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
+                   <div className="w-8 h-8 bg-[#111412] flex items-center justify-center font-bold text-lg rounded-full overflow-hidden relative">
+                     {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : <span className="text-[#D4AF37]">🌙</span>}
+                   </div>
+                 </div>
+                 <span className="font-bold text-xs uppercase tracking-[0.2em] italic" style={{ color: storeSettings.brand_name_color || '#D4AF37' }}>{storeSettings.shop_name}</span>
+              </div>
+              <button onClick={() => setIsSidebarOpen(false)} className="text-[#D4AF37] hover:text-white text-2xl font-bold bg-transparent w-8 h-8 flex items-center justify-center rounded transition-colors">✕</button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto custom-scrollbar py-6 text-[12px] font-bold text-[#111412] uppercase tracking-widest">
+               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('All'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> হোম</div>
+               
+               <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
+               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black flex items-center gap-2 mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>ক্যাটাগরি সমূহ</div>
+               {dynamicSidebarCategories.map((cat, i) => (
+                 <div key={i} className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#111412]" onClick={() => {setActiveCategory(cat); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}>
+                   <span className="text-[10px] text-[#D4AF37]">▶</span> {cat}
+                 </div>
+               ))}
+               
+               <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
+               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>প্রয়োজনীয় লিংক</div>
+               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({title: 'যোগাযোগ', content: storeSettings.contact_info}); setIsSidebarOpen(false); }}>
+                  <span>✉</span> যোগাযোগ
+               </div>
+               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({title: 'রিটার্ন পলিসি', content: storeSettings.return_policy}); setIsSidebarOpen(false); }}>
+                  <span>🛡</span> রিটার্ন পলিসি
+               </div>
+               
+               <div className="mt-10 mx-5 px-4 py-4 bg-[#111412] text-[#D4AF37] text-center rounded-sm shadow-md font-bold tracking-[0.2em] cursor-pointer border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300">
+                  📞 {storeSettings.phone}
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ position: 'relative', zIndex: 999999 }}>
         {toastMessage && ( 
           <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.2)] z-[999999] flex items-center gap-3 animate-bounce-short text-xs font-black tracking-widest text-white uppercase ${toastMessage.type === 'success' ? 'bg-[#111412] border border-[#D4AF37]' : 'bg-red-600 border border-white'}`}>
-            <span className="text-lg">{toastMessage.type === 'success' ? '✅' : '⚠️'}</span>
+            <span className="text-lg">{toastMessage.type === 'success' ? '✅' : '⚠'}</span>
             {toastMessage.msg}
           </div> 
         )}
@@ -2106,7 +2155,7 @@ export default function Home() {
                   <>
                     <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Product List</button>
                     <button onClick={() => setAdminTab('customers')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'customers' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>👥 Customers</button>
-                    <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️️ Settings</button>
+                    <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Settings</button>
                   </>
                 )}
               </div>
