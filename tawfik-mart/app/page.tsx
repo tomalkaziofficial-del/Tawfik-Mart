@@ -1203,8 +1203,6 @@ export default function Home() {
     setActiveSubCategories(prev => ({ ...prev, [catName]: subName })); 
   };
 
-  // DUMMY CATEGORIES REMOVED COMPLETELY
-  const specialCategories: string[] = []; 
   const allDynamicCats = products.flatMap(p => (p.category || '').split(',').map(c=>c.trim())).filter(Boolean);
   const dynamicSidebarCategories = Array.from(new Set([...customSections.map(c => c.title), ...allDynamicCats]));
   
@@ -1419,7 +1417,7 @@ export default function Home() {
             <div className="hidden md:flex items-center gap-7">
               <button onClick={() => { if(user) setShowProfileModal(true); else setShowAuthModal(true); }} className="text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">👤</button>
               <button onClick={() => setIsWishlistOpen(true)} className="relative text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">
-                ❤{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
+                ❤️{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
               </button>
               <button onClick={() => setIsCartOpen(true)} className={`relative text-2xl text-[#111412] hover:text-[#D4AF37] transition-all duration-300 ${animateCart ? 'scale-125 text-[#B8860B]' : ''}`}>
                 🛒{cart.length > 0 && <span className="absolute -top-1 -right-3 bg-[#111412] text-[#D4AF37] text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-[#D4AF37]">{totalItemsCount}</span>}
@@ -1501,7 +1499,6 @@ export default function Home() {
                  });
 
                  return sortedCategoriesToRender.map(catTitle => {
-                    if (activeCategory === 'All' && specialCategories.includes(catTitle)) return null;
                     if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
 
                     const section = customSections.find(s => s.title === catTitle);
@@ -2278,9 +2275,7 @@ export default function Home() {
                         <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
                            <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">1. Website Font Style</label>
                            <select value={storeSettings.font_family} onChange={e=>setStoreSettings({...storeSettings, font_family: e.target.value})} className="w-full bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner cursor-pointer" style={{fontFamily: storeSettings.font_family}}>
-                             {fontOptions.map((font, idx) => ( 
-                               <option key={idx} value={font.value} style={{fontFamily: font.value}}>{font.name}</option> 
-                             ))}
+                             {fontOptions.map((font, idx) => ( <option key={idx} value={font.value} style={{fontFamily: font.value}}>{font.name}</option> ))}
                            </select>
                         </div>
                         <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
@@ -2312,16 +2307,10 @@ export default function Home() {
                           <div className="flex items-center gap-6">
                             <div className="w-24 h-24 bg-[#111412] border-2 border-[#D4AF37] shadow-[0_0_10px_rgba(212,175,55,0.4)] rounded-full flex items-center justify-center overflow-hidden shrink-0 relative group">
                               {storeSettings.logo_url ? (
-                                <>
-                                  <img src={storeSettings.logo_url} className="w-full h-full object-cover"/>
-                                  <button type="button" onClick={() => handleRemoveImage('logo')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button>
-                                </>
+                                <><img src={storeSettings.logo_url} className="w-full h-full object-cover"/><button type="button" onClick={() => handleRemoveImage('logo')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button></>
                               ) : <span className="text-[10px] text-[#D4AF37] font-bold uppercase tracking-wider text-center">No Logo</span>}
                             </div>
-                            <div className="flex-1">
-                              <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'logo')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>
-                              {uploadingType === 'logo' && <span className="text-[10px] text-[#B8860B] block mt-3 font-black tracking-[0.2em] uppercase">Uploading...</span>}
-                            </div>
+                            <div className="flex-1"><input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'logo')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>{uploadingType === 'logo' && <span className="text-[10px] text-[#B8860B] block mt-3 font-black tracking-[0.2em] uppercase">Uploading...</span>}</div>
                           </div>
                         </div>
 
@@ -2330,25 +2319,14 @@ export default function Home() {
                           <div className="flex items-center gap-6">
                             <div className="w-32 h-24 bg-[#FAF5EB] border border-[#D4AF37] shadow-sm rounded-sm flex items-center justify-center overflow-hidden shrink-0 relative group">
                               {storeSettings.category_banners?.['WEBSITE_BG'] ? (
-                                <>
-                                  <img src={storeSettings.category_banners['WEBSITE_BG']} className="w-full h-full object-cover"/>
-                                  <button type="button" onClick={() => handleRemoveImage('website_bg')} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 flex items-center justify-center rounded-sm text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button>
-                                </>
+                                <><img src={storeSettings.category_banners['WEBSITE_BG']} className="w-full h-full object-cover"/><button type="button" onClick={() => handleRemoveImage('website_bg')} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 flex items-center justify-center rounded-sm text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button></>
                               ) : <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider text-center">No BG</span>}
                             </div>
                             <div className="flex-1 flex flex-col gap-3">
-                              <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'website_bg')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>
-                              {uploadingType === 'website_bg' && <span className="text-[10px] text-[#B8860B] block font-black tracking-[0.2em] uppercase">Uploading...</span>}
-                              
+                              <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'website_bg')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]"/>{uploadingType === 'website_bg' && <span className="text-[10px] text-[#B8860B] block font-black tracking-[0.2em] uppercase">Uploading...</span>}
                               <div className="flex items-center gap-4 mt-2 bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input type="checkbox" checked={storeSettings.bg_enabled} onChange={e=>setStoreSettings({...storeSettings, bg_enabled: e.target.checked})} className="w-4 h-4 accent-[#D4AF37] cursor-pointer"/>
-                                  <span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Show</span>
-                                </label>
-                                <div className="flex items-center gap-2 flex-1">
-                                  <span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Opacity: {storeSettings.bg_opacity}%</span>
-                                  <input type="range" min="0" max="100" value={storeSettings.bg_opacity} onChange={e=>setStoreSettings({...storeSettings, bg_opacity: Number(e.target.value)})} className="w-full accent-[#D4AF37] cursor-pointer"/>
-                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={storeSettings.bg_enabled} onChange={e=>setStoreSettings({...storeSettings, bg_enabled: e.target.checked})} className="w-4 h-4 accent-[#D4AF37] cursor-pointer"/><span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Show</span></label>
+                                <div className="flex items-center gap-2 flex-1"><span className="text-[10px] font-bold text-[#111412] uppercase tracking-widest">Opacity: {storeSettings.bg_opacity}%</span><input type="range" min="0" max="100" value={storeSettings.bg_opacity} onChange={e=>setStoreSettings({...storeSettings, bg_opacity: Number(e.target.value)})} className="w-full accent-[#D4AF37] cursor-pointer"/></div>
                               </div>
                             </div>
                           </div>
@@ -2654,9 +2632,28 @@ export default function Home() {
                       <h3 className="font-bold text-sm text-[#111412] tracking-[0.2em] uppercase">All Products ({products.length})</h3>
                       <input type="text" placeholder="Search by Name or ID..." value={adminSearchQuery} onChange={e => setAdminSearchQuery(e.target.value)} className="w-full md:w-1/3 bg-white border border-[#EADFC8] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                      {filteredAdminProducts.length > 0 ? ( filteredAdminProducts.map(item => renderProductCard(item, true)) ) : ( <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found matching your search</p> )}
-                    </div>
+                    
+                    {filteredAdminProducts.length > 0 ? (
+                       Object.entries(
+                         filteredAdminProducts.reduce((acc, product) => {
+                           const primaryCategory = product.category ? product.category.split(',')[0].trim() : 'Uncategorized';
+                           if (!acc[primaryCategory]) acc[primaryCategory] = [];
+                           acc[primaryCategory].push(product);
+                           return acc;
+                         }, {} as Record<string, Product[]>)
+                       ).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([category, catProds]) => (
+                          <div key={category} className="mb-10 bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
+                             <h4 className="font-bold text-lg text-[#111412] border-b-2 border-[#D4AF37] pb-2 mb-6 uppercase tracking-[0.15em]">
+                                {category} <span className="text-[#D4AF37] text-sm ml-2">({catProds.length} Products)</span>
+                             </h4>
+                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                                {catProds.map(item => renderProductCard(item, true))}
+                             </div>
+                          </div>
+                       ))
+                    ) : (
+                       <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest bg-white border border-[#EADFC8] rounded-sm">No products found matching your search</p>
+                    )}
                   </div>
                 )}
 
