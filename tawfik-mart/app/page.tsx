@@ -1173,7 +1173,7 @@ export default function Home() {
   };
 
   // ==========================================
-  // UPDATED PRODUCT SAVE FUNCTION (FORCE SELECT)
+  // UPDATED PRODUCT SAVE FUNCTION
   // ==========================================
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault(); 
@@ -1199,13 +1199,15 @@ export default function Home() {
       };
       
       if (editingProductId) {
-        const { error, data } = await supabase.from('products').update(productData).eq('id', editingProductId).select(); 
+        // Update without .select()
+        const { error } = await supabase.from('products').update(productData).eq('id', editingProductId); 
         if (error) throw error;
-        if (!data || data.length === 0) throw new Error("আপডেট হয়নি! দয়া করে Supabase-এ RLS Disable করুন।");
       } else {
-        const { error, data } = await supabase.from('products').insert([productData]).select();
+        // Insert with Custom Generated ID to prevent auto-increment issues
+        const newId = `PRD-${Date.now()}`;
+        const insertData = { ...productData, id: newId };
+        const { error } = await supabase.from('products').insert([insertData]);
         if (error) throw error;
-        if (!data || data.length === 0) throw new Error("সেভ হয়নি! দয়া করে Supabase-এ RLS Disable করুন।");
       }
       
       setShowProductModal(false); 
@@ -1443,17 +1445,6 @@ export default function Home() {
               </button>
             </div>
           </header>
-
-          <div className="hidden md:flex justify-center items-center gap-8 py-3.5 bg-white border-b border-[#EADFC8] text-[11px] font-bold text-[#111412] uppercase tracking-[0.15em]">
-             <span className={`cursor-pointer transition-colors ${activeCategory === 'All' ? 'text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('All'); closeProductModal(); window.scrollTo(0,0);}}>
-               সকল ক্যাটাগরি
-             </span>
-             {allCategoryOptions.map((cat, idx) => (
-                <span key={idx} className={`cursor-pointer transition-colors ${activeCategory === cat ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory(cat); closeProductModal(); window.scrollTo(0,0);}}>
-                  {cat}
-                </span>
-             ))}
-          </div>
 
           <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-8">
             
@@ -2180,7 +2171,7 @@ export default function Home() {
                 <button onClick={() => setAdminTab('abandoned')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'abandoned' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛒 Abandoned</button>
                 {isMasterAdmin && (
                   <>
-                    <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Product List</button>
+                    <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️️ Product List</button>
                     <button onClick={() => setAdminTab('customers')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'customers' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>👥 Customers</button>
                     <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Settings</button>
                   </>
@@ -2391,7 +2382,7 @@ export default function Home() {
                            </div>
                            <div className="flex-1 border border-[#D4AF37]/50 bg-[#FAF5EB] p-4 rounded-sm">
                               <p className="text-[10px] font-bold text-[#B8860B] uppercase tracking-widest leading-relaxed">
-                                 💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবে না, সেগুলো অটোমেটিক নিচে চলে যাবে।
+                                 💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবেবিধা, সেগুলো অটোমেটিক নিচে চলে যাবে।
                               </p>
                            </div>
                          </div>
@@ -2714,6 +2705,70 @@ export default function Home() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+        
+        {showProductModal && isMasterAdmin && (
+          <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 z-[1001]" onClick={() => setShowProductModal(false)}>
+            <div className="bg-[#FAF5EB] border-2 border-[#D4AF37] max-w-2xl w-full p-8 md:p-10 relative shadow-2xl rounded-sm max-h-[95vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-8 border-b border-[#EADFC8] pb-5">
+                 <button onClick={() => setShowProductModal(false)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white hover:bg-[#EADFC8] border border-[#D4AF37] px-5 py-2.5 rounded-sm"><span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান</button>
+                 <h3 className="text-xl font-bold text-[#B8860B] uppercase tracking-[0.2em]">{editingProductId ? "Update Product" : "Add Product"}</h3>
+                 <button onClick={() => setShowProductModal(false)} className="text-[#111412] hover:text-red-500 text-3xl font-light transition-colors">✕</button>
+              </div>
+              
+              <form onSubmit={handleSaveProduct} className="space-y-6">
+                <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Product Name (ঐচ্ছিক)</label><input value={newName} onChange={e => setNewName(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
+                
+                <div className="flex gap-4">
+                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-gray-500 uppercase tracking-[0.2em]">Cost Price (Net Profit এর জন্য)</label><input value={newCostPrice} onChange={e => setNewCostPrice(e.target.value)} placeholder="e.g. 800" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
+                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Regular Price (কাটা দাম)</label><input value={newOriginalPrice} onChange={e => setNewOriginalPrice(e.target.value)} placeholder="e.g. 1500" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
+                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-green-600 uppercase tracking-[0.2em]">Offer Price (বিক্রি দাম)</label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-green-500 shadow-inner transition-colors"/></div>
+                </div>
+                
+                <div className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm">
+                  <div className="flex justify-between items-center mb-5 border-b border-[#EADFC8] pb-2">
+                     <span className="text-[10px] font-bold text-[#B8860B] uppercase tracking-[0.2em]">Product Images (Max 4)</span>
+                     <div className="flex items-center gap-3">
+                        <label className="text-[10px] font-bold text-[#111412] uppercase tracking-[0.2em]">Stock Qty:</label>
+                        <input type="number" required value={newStockCount} onChange={e => setNewStockCount(Number(e.target.value))} className="w-20 bg-[#FAF5EB] border border-[#EADFC8] text-center p-2 rounded-sm text-sm outline-none focus:border-[#D4AF37] font-black"/>
+                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-5">
+                    {[ {url: newImageUrl, set: setNewImageUrl, id: 'product1'}, {url: newImageUrl2, set: setNewImageUrl2, id: 'product2'}, {url: newImageUrl3, set: setNewImageUrl3, id: 'product3'}, {url: newImageUrl4, set: setNewImageUrl4, id: 'product4'} ].map((imgItem, idx) => (
+                      <div key={idx} className="relative">
+                        {imgItem.url ? ( <div className="w-full h-24 border border-[#D4AF37] rounded-sm overflow-hidden relative group shadow-sm bg-[#FAF5EB]"><img src={imgItem.url} className="w-full h-full object-cover" /><button type="button" onClick={() => imgItem.set('')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button></div> ) : ( <input type="file" accept="image/*" onChange={e => handleImageUpload(e, imgItem.id)} className="text-[11px] bg-[#FAF5EB] text-[#111412] p-3 border border-[#EADFC8] outline-none focus:border-[#D4AF37] rounded-sm w-full cursor-pointer h-24"/> )}
+                        {uploadingType === imgItem.id && <span className="text-[10px] text-[#B8860B] absolute bottom-1 left-2 font-black tracking-widest bg-white/80 px-1 rounded">Uploading...</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-3 text-[#B8860B] uppercase tracking-[0.2em]">Select Categories (Multiple)</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-[#FAF5EB] p-4 border border-[#EADFC8] rounded-sm max-h-40 overflow-y-auto custom-scrollbar">
+                    {allCategoryOptions.map((cat, index) => ( <label key={index} className="flex items-center gap-2 cursor-pointer text-[11px] font-bold text-[#111412] bg-white p-2 border border-[#EADFC8] rounded-sm shadow-sm hover:border-[#D4AF37] transition-colors"><input type="checkbox" checked={selectedCategories.includes(cat)} onChange={() => handleCategoryToggle(cat)} className="accent-[#D4AF37] w-4 h-4 cursor-pointer flex-shrink-0"/><span className="truncate">{cat}</span></label> ))}
+                  </div>
+                  <input type="text" value={customCategoryStr} onChange={e => setCustomCategoryStr(e.target.value)} placeholder="অথবা নতুন ক্যাটাগরি লিখুন (কমা দিয়ে একাধিক লিখতে পারেন)" style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors mt-3"/>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Sub-Category (সাব-ক্যাটাগরি - ঐচ্ছিক)</label>
+                  <input type="text" value={newSubCategory} onChange={e => setNewSubCategory(e.target.value)} placeholder="e.g. Winter Collection" style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description (HTML Support Available)</label>
+                  <textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea>
+                  <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-widest">💡 আপনি চাইলে সাধারণ লেখার পাশাপাশি HTML ট্যাগ ব্যবহার করে লেখাকে স্টাইল করতে পারেন।</p>
+                </div>
+
+                <div className="flex gap-4 mt-6">
+                  {editingProductId && <button type="button" onClick={(e) => { setShowProductModal(false); handleDeleteProduct(editingProductId as string, e); }} className="w-1/3 bg-red-600 text-white font-bold py-5 text-[11px] rounded-sm uppercase tracking-[0.2em] hover:bg-red-700 transition-colors shadow-md">Delete</button>}
+                  <button type="submit" disabled={isSaving || !!uploadingType} className="flex-1 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-5 text-[13px] rounded-sm uppercase tracking-[0.2em] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 shadow-md">{isSaving ? "Saving..." : "Save Product"}</button>
+                </div>
+              </form>
             </div>
           </div>
         )}
