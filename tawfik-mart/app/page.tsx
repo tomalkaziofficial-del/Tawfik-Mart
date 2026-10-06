@@ -1179,16 +1179,24 @@ export default function Home() {
       };
       
       if (editingProductId) {
-        await supabase.from('products').update(productData).eq('id', editingProductId); 
+        const { error } = await supabase.from('products').update(productData).eq('id', editingProductId); 
+        if (error) throw error;
       } else {
-        await supabase.from('products').insert([productData]);
+        const validUUID = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+        const insertData = { ...productData, id: validUUID };
+        const { error } = await supabase.from('products').insert([insertData]);
+        if (error) throw error;
       }
       
       setShowProductModal(false); 
       fetchProducts(); 
-      showToast("সেভ হয়েছে!", "success");
+      showToast("সফলভাবে সেভ হয়েছে!", "success");
     } catch (error: any) { 
-      showToast("Error saving product", "error"); 
+      console.error("Save Error:", error);
+      showToast(error.message || "Error saving product. Please check data format.", "error"); 
     } finally { 
       setIsSaving(false); 
     }
@@ -1900,7 +1908,7 @@ export default function Home() {
                        </label>
                        <label className="flex items-center gap-3 text-sm text-[#111412] font-bold cursor-pointer">
                          <input type="radio" name="shipping" checked={shippingLocation==='outside'} onChange={()=>setShippingLocation('outside')} className="accent-[#D4AF37] w-4 h-4 cursor-pointer" />
-                         <span>ঢাকার বাইরে {isFreeDelivery ? <><del className="text-gray-400">৳ ১২০</del> <span className="text-green-600 bg-green-100 px-2 rounded-sm ml-1 text-xs">FREE</span></> : '(৳ ১২০)'}</span>
+                         <span>ঢাকার বাইরে {isFreeDelivery ? <><del className="text-gray-400">৳ ১২0</del> <span className="text-green-600 bg-green-100 px-2 rounded-sm ml-1 text-xs">FREE</span></> : '(৳ ১২০)'}</span>
                        </label>
                     </div>
                   </div>
@@ -2172,10 +2180,10 @@ export default function Home() {
                   
                   const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
                   
-                  // NET PROFIT CALCULATION
+                  // NET PROFIT CALCULATION (Total Rev - Total Cost)
                   const totalProfit = deliveredOrders.reduce((sum, order) => {
                      const orderProfit = (order.items || []).reduce((itemSum, item) => {
-                         const cost = 0;
+                         const cost = 0; // Removed cost_price
                          const sellPrice = getNumericPrice(item.price);
                          return itemSum + ((sellPrice - cost) * item.quantity);
                      }, 0);
