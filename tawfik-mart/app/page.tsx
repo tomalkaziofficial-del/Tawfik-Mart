@@ -166,6 +166,7 @@ export default function Home() {
   const [newSubCategory, setNewSubCategory] = useState(''); 
   const [newBrand, setNewBrand] = useState(''); 
   const [newColor, setNewColor] = useState(''); 
+  const [newInStock, setNewInStock] = useState(true);
   
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
@@ -186,6 +187,8 @@ export default function Home() {
     shop_name: 'Zeenat Mart', 
     phone: '01632331534',
     logo_url: '',
+    flashDealActive: false, 
+    endTime: Date.now() + 12 * 60 * 60 * 1000, 
     bg_enabled: true,
     bg_opacity: 70,
     font_family: 'sans-serif',
@@ -403,7 +406,7 @@ export default function Home() {
         if (!loadedSections || !Array.isArray(loadedSections)) {
             loadedSections = [];
             Object.keys(safeCatBanners).forEach(key => {
-                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT', 'CATEGORY_ORDER', 'FREE_DELIVERY_THRESHOLD', 'BLOCKLIST', 'STAFF_EMAILS'].includes(key)) {
+                if (!['WEBSITE_BG', 'TXT_CONTACT', 'TXT_RETURN', 'TXT_DELIVERY', 'FLASH_ACTIVE', 'CUSTOM_SECTIONS', 'BG_ENABLED', 'BG_OPACITY', 'FONT_FAMILY', 'BRAND_NAME_COLOR', 'HEADING_COLOR', 'PAGE_TEXT_COLOR', 'FB_PAGE_URL', 'DEFAULT_SORT', 'CATEGORY_ORDER', 'FREE_DELIVERY_THRESHOLD', 'BLOCKLIST', 'STAFF_EMAILS'].includes(key)) {
                     loadedSections.push({ id: Date.now().toString() + Math.random(), title: key, fontSize: 36, imageUrl: safeCatBanners[key], color: '#B8860B', imageHeight: 300 });
                 }
             });
@@ -424,6 +427,7 @@ export default function Home() {
           contact_info: safeCatBanners['TXT_CONTACT'] || prev.contact_info,
           return_policy: safeCatBanners['TXT_RETURN'] || prev.return_policy,
           delivery_policy: safeCatBanners['TXT_DELIVERY'] || prev.delivery_policy,
+          flashDealActive: safeCatBanners['FLASH_ACTIVE'] !== undefined ? safeCatBanners['FLASH_ACTIVE'] : false,
           bg_enabled: safeCatBanners['BG_ENABLED'] !== undefined ? safeCatBanners['BG_ENABLED'] : true,
           bg_opacity: safeCatBanners['BG_OPACITY'] !== undefined ? Number(safeCatBanners['BG_OPACITY']) : 70,
           font_family: safeCatBanners['FONT_FAMILY'] || 'sans-serif',
@@ -454,8 +458,7 @@ export default function Home() {
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
+      const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
       if (data) setOrders(data);
     } catch(err) {
       console.error(err);
@@ -464,8 +467,7 @@ export default function Home() {
 
   const fetchUserOrders = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false }); 
-      if (error) throw error;
+      const { data } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false }); 
       if (data) setUserOrders(data);
     } catch(err) {
       console.error(err);
@@ -474,8 +476,7 @@ export default function Home() {
 
   const fetchReviews = async (productId: string) => {
     try {
-      const { data, error } = await supabase.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
-      if (error) throw error;
+      const { data } = await supabase.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
       if (data) setProductReviews(data);
     } catch (error) {
       console.error(error);
@@ -542,8 +543,7 @@ export default function Home() {
      
      const newCatBanners = { ...storeSettings.category_banners, BLOCKLIST: newList };
      try {
-       const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
-       if (error) throw error;
+       await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
        setStoreSettings(prev => ({ ...prev, blocklist: newList, category_banners: newCatBanners }));
        showToast(currentList.includes(phone) ? "Customer unblocked!" : "Customer blocked successfully!", "success");
      } catch (e) { 
@@ -743,8 +743,8 @@ export default function Home() {
           if(abandonedDraftId) { 
             await supabase.from('orders').update(orderData).eq('id', abandonedDraftId); 
           } else { 
-            const { data, error } = await supabase.from('orders').insert([orderData]).select(); 
-            if(!error && data && data[0]) setAbandonedDraftId(data[0].id); 
+            const { data } = await supabase.from('orders').insert([orderData]).select(); 
+            if(data && data[0]) setAbandonedDraftId(data[0].id); 
           }
         } catch(e) {
           console.error("Failed to save draft:", e);
@@ -804,23 +804,20 @@ export default function Home() {
       let createdOrderId = '';
       
       if(abandonedDraftId) { 
-        const { data, error } = await supabase.from('orders').update(orderData).eq('id', abandonedDraftId).select(); 
-        if (error) throw error;
+        const { data } = await supabase.from('orders').update(orderData).eq('id', abandonedDraftId).select(); 
         createdOrderId = data && data[0] ? data[0].id : 'ORD_' + Date.now(); 
       } else { 
-        const { data, error } = await supabase.from('orders').insert([orderData]).select(); 
-        if (error) throw error;
+        const { data } = await supabase.from('orders').insert([orderData]).select(); 
         createdOrderId = data && data[0] ? data[0].id : 'ORD_' + Date.now(); 
       }
 
       for (const item of cart) {
          if (item.stock_count !== undefined) {
              const remain = item.stock_count - item.quantity;
-             const { error } = await supabase.from('products').update({ 
+             await supabase.from('products').update({ 
                stock_count: remain < 0 ? 0 : remain, 
                in_stock: remain > 0 
              }).eq('id', item.id);
-             if (error) console.error(error);
          }
       }
 
@@ -938,8 +935,7 @@ export default function Home() {
 
   const updateOrderStatus = async (id: string, newStatus: string) => { 
     try { 
-      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id); 
-      if (error) throw error;
+      await supabase.from('orders').update({ status: newStatus }).eq('id', id); 
       fetchOrders(); 
       showToast("স্ট্যাটাস আপডেট হয়েছে", "success"); 
     } catch(err) {
@@ -973,17 +969,14 @@ export default function Home() {
       const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(cleanFileName);
       
       if (type === 'logo') {
-        const { error } = await supabase.from('store_settings').update({ logo_url: publicUrl }).eq('id', 1);
-        if (error) throw error;
+        await supabase.from('store_settings').update({ logo_url: publicUrl }).eq('id', 1);
       } else if (type === 'banner' && index !== undefined) {
          let newBanners = [...storeSettings.banners];
          newBanners[index].imageUrl = publicUrl;
-         const { error } = await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
-         if (error) throw error;
+         await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
       } else if (type === 'website_bg') {
          const newCatBanners = { ...storeSettings.category_banners, ['WEBSITE_BG']: publicUrl };
-         const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
-         if (error) throw error;
+         await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
       } else if (type === 'custom_section' && catName) {
          setCustomSections(prev => prev.map(s => s.id === catName ? { ...s, imageUrl: publicUrl } : s));
          showToast("ব্যানার আপলোড হয়েছে! সেভ করুন।", "success"); 
@@ -1011,18 +1004,15 @@ export default function Home() {
     if (!window.confirm("মুছে ফেলতে চান?")) return;
     try {
       if (type === 'logo') {
-        const { error } = await supabase.from('store_settings').update({ logo_url: '' }).eq('id', 1);
-        if (error) throw error;
+        await supabase.from('store_settings').update({ logo_url: '' }).eq('id', 1);
       } else if (type === 'website_bg') {
         const newCatBanners = { ...storeSettings.category_banners }; 
         delete newCatBanners['WEBSITE_BG'];
-        const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
-        if (error) throw error;
+        await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
       } else if (type === 'banner' && index !== undefined) {
         let newBanners = [...storeSettings.banners]; 
         newBanners[index].imageUrl = '';
-        const { error } = await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
-        if (error) throw error;
+        await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
       }
       
       showToast("মুছে ফেলা হয়েছে!", "success"); 
@@ -1040,6 +1030,7 @@ export default function Home() {
          'TXT_CONTACT': storeSettings.contact_info, 
          'TXT_RETURN': storeSettings.return_policy, 
          'TXT_DELIVERY': storeSettings.delivery_policy,
+         'FLASH_ACTIVE': storeSettings.flashDealActive, 
          'CUSTOM_SECTIONS': customSections, 
          'BG_ENABLED': storeSettings.bg_enabled,
          'BG_OPACITY': storeSettings.bg_opacity, 
@@ -1055,13 +1046,11 @@ export default function Home() {
          'STAFF_EMAILS': storeSettings.staff_emails
       };
       
-      const { error } = await supabase.from('store_settings').update({ 
+      await supabase.from('store_settings').update({ 
         shop_name: storeSettings.shop_name, 
         phone: storeSettings.phone, 
         category_banners: newCatBanners 
       }).eq('id', 1);
-      
-      if (error) throw error;
       
       showToast("সেটিংস সেভ হয়েছে!", "success"); 
       fetchSettings();
@@ -1087,12 +1076,10 @@ export default function Home() {
         return showToast("প্রোডাক্ট পাওয়া যায়নি!", "error"); 
       }
       
-      const { error } = await supabase.from('products').update({ 
+      await supabase.from('products').update({ 
         original_price: bulkOriginalPrice || null, 
         price: bulkOfferPrice 
       }).in('id', productsToUpdate.map(p => p.id));
-      
-      if (error) throw error;
       
       showToast(`আপডেট হয়েছে!`, "success"); 
       setBulkOriginalPrice(''); 
@@ -1130,6 +1117,7 @@ export default function Home() {
     setNewSubCategory(''); 
     setNewBrand(''); 
     setNewColor(''); 
+    setNewInStock(true); 
     setShowProductModal(true); 
     setShowAdminDashboard(false); 
   };
@@ -1151,6 +1139,7 @@ export default function Home() {
     setNewSubCategory(product.tag || ''); 
     setNewBrand(product.brand || ''); 
     setNewColor(product.color || ''); 
+    setNewInStock(product.in_stock !== false); 
     setShowProductModal(true); 
     setShowAdminDashboard(false);
   };
@@ -1159,8 +1148,7 @@ export default function Home() {
     if(e) e.stopPropagation(); 
     if (!window.confirm("ডিলিট করতে চান?")) return; 
     try { 
-      const { error } = await supabase.from('products').delete().eq('id', id); 
-      if (error) throw error;
+      await supabase.from('products').delete().eq('id', id); 
       fetchProducts(); 
       showToast("ডিলিট হয়েছে!", "success"); 
     } catch (error) {
@@ -1191,21 +1179,16 @@ export default function Home() {
       };
       
       if (editingProductId) {
-        const { error } = await supabase.from('products').update(productData).eq('id', editingProductId); 
-        if (error) throw error;
+        await supabase.from('products').update(productData).eq('id', editingProductId); 
       } else {
-        const newId = `PRD-${Date.now()}`;
-        const insertData = { ...productData, id: newId };
-        const { error } = await supabase.from('products').insert([insertData]);
-        if (error) throw error;
+        await supabase.from('products').insert([productData]);
       }
       
       setShowProductModal(false); 
-      await fetchProducts(); 
-      showToast("সফলভাবে সেভ হয়েছে!", "success");
+      fetchProducts(); 
+      showToast("সেভ হয়েছে!", "success");
     } catch (error: any) { 
-      console.error("Save Error:", error);
-      showToast(error.message || "Error saving product", "error"); 
+      showToast("Error saving product", "error"); 
     } finally { 
       setIsSaving(false); 
     }
@@ -1215,10 +1198,11 @@ export default function Home() {
     setActiveSubCategories(prev => ({ ...prev, [catName]: subName })); 
   };
 
+  const specialCategories = ["⚡ ফ্লাশ সেল", "নতুন কালেকশন", "এক্সক্লুসিভ", "সকল ব্র্যান্ড"];
   const allDynamicCats = products.flatMap(p => (p.category || '').split(',').map(c=>c.trim())).filter(Boolean);
   const dynamicSidebarCategories = Array.from(new Set([...customSections.map(c => c.title), ...allDynamicCats]));
   
-  const allCategoryOptions = Array.from(new Set([...dynamicSidebarCategories]));
+  const allCategoryOptions = Array.from(new Set([...specialCategories, ...dynamicSidebarCategories]));
 
   const filteredProducts = products.filter(item => 
     (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -1436,17 +1420,6 @@ export default function Home() {
             </div>
           </header>
 
-          <div className="hidden md:flex justify-center items-center gap-8 py-3.5 bg-white border-b border-[#EADFC8] text-[11px] font-bold text-[#111412] uppercase tracking-[0.15em]">
-             <span className={`cursor-pointer transition-colors ${activeCategory === 'All' ? 'text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('All'); closeProductModal(); window.scrollTo(0,0);}}>
-               সকল ক্যাটাগরি
-             </span>
-             {allCategoryOptions.map((cat, idx) => (
-                <span key={idx} className={`cursor-pointer transition-colors ${activeCategory === cat ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory(cat); closeProductModal(); window.scrollTo(0,0);}}>
-                  {cat}
-                </span>
-             ))}
-          </div>
-
           <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-8">
             
             {/* Banner Section Without Timer */}
@@ -1521,6 +1494,7 @@ export default function Home() {
                  });
 
                  return sortedCategoriesToRender.map(catTitle => {
+                    if (activeCategory === 'All' && specialCategories.includes(catTitle)) return null;
                     if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
 
                     const section = customSections.find(s => s.title === catTitle);
@@ -1633,56 +1607,10 @@ export default function Home() {
         )}
       </main>
 
-      {/* Sidebar Modal Section (FIXED z-index) */}
-      {isSidebarOpen && (
-        <div style={{ position: 'relative', zIndex: 999999 }}>
-          <div className="fixed inset-0 bg-[#111412]/60 backdrop-blur-sm transition-opacity z-[999998]" onClick={() => setIsSidebarOpen(false)}></div>
-          <div className="fixed top-0 left-0 w-[280px] md:w-[320px] h-full bg-[#FAF5EB] shadow-[5px_0_30px_rgba(0,0,0,0.5)] flex flex-col transform transition-transform duration-300 border-r border-[#D4AF37]/50 z-[999999]">
-            <div className="p-5 flex justify-between items-center bg-[#111412] text-[#D4AF37] shadow-sm border-b border-[#D4AF37]/30">
-              <div className="flex items-center gap-3">
-                 <div className="relative flex items-center justify-center p-1">
-                   <div className="absolute inset-0 rounded-full border-l-[2px] border-b-[2px] border-[#D4AF37] shadow-[-2px_2px_5px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
-                   <div className="w-8 h-8 bg-[#111412] flex items-center justify-center font-bold text-lg rounded-full overflow-hidden relative">
-                     {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : <span className="text-[#D4AF37]">🌙</span>}
-                   </div>
-                 </div>
-                 <span className="font-bold text-xs uppercase tracking-[0.2em] italic" style={{ color: storeSettings.brand_name_color || '#D4AF37' }}>{storeSettings.shop_name}</span>
-              </div>
-              <button onClick={() => setIsSidebarOpen(false)} className="text-[#D4AF37] hover:text-white text-2xl font-bold bg-transparent w-8 h-8 flex items-center justify-center rounded transition-colors">✕</button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto custom-scrollbar py-6 text-[12px] font-bold text-[#111412] uppercase tracking-widest">
-               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('All'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> হোম</div>
-               
-               <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
-               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black flex items-center gap-2 mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>ক্যাটাগরি সমূহ</div>
-               {dynamicSidebarCategories.map((cat, i) => (
-                 <div key={i} className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#111412]" onClick={() => {setActiveCategory(cat); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}>
-                   <span className="text-[10px] text-[#D4AF37]">▶</span> {cat}
-                 </div>
-               ))}
-               
-               <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
-               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>প্রয়োজনীয় লিংক</div>
-               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({title: 'যোগাযোগ', content: storeSettings.contact_info}); setIsSidebarOpen(false); }}>
-                  <span>✉</span> যোগাযোগ
-               </div>
-               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({title: 'রিটার্ন পলিসি', content: storeSettings.return_policy}); setIsSidebarOpen(false); }}>
-                  <span>🛡</span> রিটার্ন পলিসি
-               </div>
-               
-               <div className="mt-10 mx-5 px-4 py-4 bg-[#111412] text-[#D4AF37] text-center rounded-sm shadow-md font-bold tracking-[0.2em] cursor-pointer border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300">
-                  📞 {storeSettings.phone}
-               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={{ position: 'relative', zIndex: 999999 }}>
+      <div style={{ position: 'relative', zIndex: 99999 }}>
         {toastMessage && ( 
           <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.2)] z-[999999] flex items-center gap-3 animate-bounce-short text-xs font-black tracking-widest text-white uppercase ${toastMessage.type === 'success' ? 'bg-[#111412] border border-[#D4AF37]' : 'bg-red-600 border border-white'}`}>
-            <span className="text-lg">{toastMessage.type === 'success' ? '✅' : '⚠'}</span>
+            <span className="text-lg">{toastMessage.type === 'success' ? '✅' : '⚠️'}</span>
             {toastMessage.msg}
           </div> 
         )}
@@ -2187,17 +2115,6 @@ export default function Home() {
                   const cancelledOrders = orders.filter(o => o.status === 'CANCELLED');
                   
                   const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-                  
-                  // NET PROFIT CALCULATION (Total Rev - Total Cost)
-                  const totalProfit = deliveredOrders.reduce((sum, order) => {
-                     const orderProfit = (order.items || []).reduce((itemSum, item) => {
-                         // Default cost is 0 since cost_price was removed
-                         const cost = 0;
-                         const sellPrice = getNumericPrice(item.price);
-                         return itemSum + ((sellPrice - cost) * item.quantity);
-                     }, 0);
-                     return sum + orderProfit;
-                  }, 0);
 
                   // CHARTS DATA
                   const pieData = [
@@ -2217,12 +2134,7 @@ export default function Home() {
                     <div className="space-y-10">
                        <h3 className="font-bold text-xl mb-4 text-[#111412] tracking-[0.2em] uppercase border-b border-[#EADFC8] pb-4">Business Analytics Overview</h3>
                        
-                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                          <div className="bg-gradient-to-br from-[#111412] to-[#2a2a2a] p-6 rounded-md shadow-lg border border-[#D4AF37]">
-                             <p className="text-[10px] text-[#EADFC8] font-bold uppercase tracking-widest mb-2">Net Profit (Delivered)</p>
-                             <p className="text-3xl font-black text-[#D4AF37]">৳ {totalProfit.toLocaleString()}</p>
-                             <p className="text-[9px] mt-2 text-gray-400">After deducting cost prices</p>
-                          </div>
+                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                           <div className="bg-white p-6 rounded-md shadow-md border border-[#EADFC8]">
                              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Total Revenue</p>
                              <p className="text-3xl font-black text-[#111412]">৳ {totalRevenue.toLocaleString()}</p>
@@ -2655,28 +2567,9 @@ export default function Home() {
                       <h3 className="font-bold text-sm text-[#111412] tracking-[0.2em] uppercase">All Products ({products.length})</h3>
                       <input type="text" placeholder="Search by Name or ID..." value={adminSearchQuery} onChange={e => setAdminSearchQuery(e.target.value)} className="w-full md:w-1/3 bg-white border border-[#EADFC8] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
                     </div>
-                    
-                    {filteredAdminProducts.length > 0 ? (
-                       Object.entries(
-                         filteredAdminProducts.reduce((acc, product) => {
-                           const primaryCategory = product.category ? product.category.split(',')[0].trim() : 'Uncategorized';
-                           if (!acc[primaryCategory]) acc[primaryCategory] = [];
-                           acc[primaryCategory].push(product);
-                           return acc;
-                         }, {} as Record<string, Product[]>)
-                       ).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([category, catProds]) => (
-                          <div key={category} className="mb-10 bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
-                             <h4 className="font-bold text-lg text-[#111412] border-b-2 border-[#D4AF37] pb-2 mb-6 uppercase tracking-[0.15em]">
-                                {category} <span className="text-[#D4AF37] text-sm ml-2">({catProds.length} Products)</span>
-                             </h4>
-                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                                {catProds.map(item => renderProductCard(item, true))}
-                             </div>
-                          </div>
-                       ))
-                    ) : (
-                       <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest bg-white border border-[#EADFC8] rounded-sm">No products found matching your search</p>
-                    )}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                      {filteredAdminProducts.length > 0 ? ( filteredAdminProducts.map(item => renderProductCard(item, true)) ) : ( <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found matching your search</p> )}
+                    </div>
                   </div>
                 )}
 
@@ -2707,6 +2600,69 @@ export default function Home() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+        
+        {showProductModal && isMasterAdmin && (
+          <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 z-[1001]" onClick={() => setShowProductModal(false)}>
+            <div className="bg-[#FAF5EB] border-2 border-[#D4AF37] max-w-2xl w-full p-8 md:p-10 relative shadow-2xl rounded-sm max-h-[95vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-8 border-b border-[#EADFC8] pb-5">
+                 <button onClick={() => setShowProductModal(false)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white hover:bg-[#EADFC8] border border-[#D4AF37] px-5 py-2.5 rounded-sm"><span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান</button>
+                 <h3 className="text-xl font-bold text-[#B8860B] uppercase tracking-[0.2em]">{editingProductId ? "Update Product" : "Add Product"}</h3>
+                 <button onClick={() => setShowProductModal(false)} className="text-[#111412] hover:text-red-500 text-3xl font-light transition-colors">✕</button>
+              </div>
+              
+              <form onSubmit={handleSaveProduct} className="space-y-6">
+                <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Product Name (ঐচ্ছিক)</label><input value={newName} onChange={e => setNewName(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
+                
+                <div className="flex gap-4">
+                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Regular Price (কাটা দাম)</label><input value={newOriginalPrice} onChange={e => setNewOriginalPrice(e.target.value)} placeholder="e.g. 1500" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
+                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-green-600 uppercase tracking-[0.2em]">Offer Price (বিক্রি দাম)</label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-green-500 shadow-inner transition-colors"/></div>
+                </div>
+                
+                <div className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm">
+                  <div className="flex justify-between items-center mb-5 border-b border-[#EADFC8] pb-2">
+                     <span className="text-[10px] font-bold text-[#B8860B] uppercase tracking-[0.2em]">Product Images (Max 4)</span>
+                     <div className="flex items-center gap-3">
+                        <label className="text-[10px] font-bold text-[#111412] uppercase tracking-[0.2em]">Stock Qty:</label>
+                        <input type="number" required value={newStockCount} onChange={e => setNewStockCount(Number(e.target.value))} className="w-20 bg-[#FAF5EB] border border-[#EADFC8] text-center p-2 rounded-sm text-sm outline-none focus:border-[#D4AF37] font-black"/>
+                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-5">
+                    {[ {url: newImageUrl, set: setNewImageUrl, id: 'product1'}, {url: newImageUrl2, set: setNewImageUrl2, id: 'product2'}, {url: newImageUrl3, set: setNewImageUrl3, id: 'product3'}, {url: newImageUrl4, set: setNewImageUrl4, id: 'product4'} ].map((imgItem, idx) => (
+                      <div key={idx} className="relative">
+                        {imgItem.url ? ( <div className="w-full h-24 border border-[#D4AF37] rounded-sm overflow-hidden relative group shadow-sm bg-[#FAF5EB]"><img src={imgItem.url} className="w-full h-full object-cover" /><button type="button" onClick={() => imgItem.set('')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button></div> ) : ( <input type="file" accept="image/*" onChange={e => handleImageUpload(e, imgItem.id)} className="text-[11px] bg-[#FAF5EB] text-[#111412] p-3 border border-[#EADFC8] outline-none focus:border-[#D4AF37] rounded-sm w-full cursor-pointer h-24"/> )}
+                        {uploadingType === imgItem.id && <span className="text-[10px] text-[#B8860B] absolute bottom-1 left-2 font-black tracking-widest bg-white/80 px-1 rounded">Uploading...</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-3 text-[#B8860B] uppercase tracking-[0.2em]">Select Categories (Multiple)</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-[#FAF5EB] p-4 border border-[#EADFC8] rounded-sm max-h-40 overflow-y-auto custom-scrollbar">
+                    {allCategoryOptions.map((cat, index) => ( <label key={index} className="flex items-center gap-2 cursor-pointer text-[11px] font-bold text-[#111412] bg-white p-2 border border-[#EADFC8] rounded-sm shadow-sm hover:border-[#D4AF37] transition-colors"><input type="checkbox" checked={selectedCategories.includes(cat)} onChange={() => handleCategoryToggle(cat)} className="accent-[#D4AF37] w-4 h-4 cursor-pointer flex-shrink-0"/><span className="truncate">{cat}</span></label> ))}
+                  </div>
+                  <input type="text" value={customCategoryStr} onChange={e => setCustomCategoryStr(e.target.value)} placeholder="অথবা নতুন ক্যাটাগরি লিখুন (কমা দিয়ে একাধিক লিখতে পারেন)" style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors mt-3"/>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Sub-Category (সাব-ক্যাটাগরি - ঐচ্ছিক)</label>
+                  <input type="text" value={newSubCategory} onChange={e => setNewSubCategory(e.target.value)} placeholder="e.g. Winter Collection" style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description (HTML Support Available)</label>
+                  <textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea>
+                  <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-widest">💡 আপনি চাইলে সাধারণ লেখার পাশাপাশি HTML ট্যাগ ব্যবহার করে লেখাকে স্টাইল করতে পারেন।</p>
+                </div>
+
+                <div className="flex gap-4 mt-6">
+                  {editingProductId && <button type="button" onClick={(e) => { setShowProductModal(false); handleDeleteProduct(editingProductId as string, e); }} className="w-1/3 bg-red-600 text-white font-bold py-5 text-[11px] rounded-sm uppercase tracking-[0.2em] hover:bg-red-700 transition-colors shadow-md">Delete</button>}
+                  <button type="submit" disabled={isSaving || !!uploadingType} className="flex-1 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-5 text-[13px] rounded-sm uppercase tracking-[0.2em] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 shadow-md">{isSaving ? "Saving..." : "Save Product"}</button>
+                </div>
+              </form>
             </div>
           </div>
         )}
