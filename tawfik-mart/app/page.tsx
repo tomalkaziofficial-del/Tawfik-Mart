@@ -154,7 +154,6 @@ export default function Home() {
   const [newName, setNewName] = useState(''); 
   const [newPrice, setNewPrice] = useState(''); 
   const [newOriginalPrice, setNewOriginalPrice] = useState('');
-  const [newCostPrice, setNewCostPrice] = useState('');
   const [newStockCount, setNewStockCount] = useState<number>(10);
   const [newImageUrl, setNewImageUrl] = useState(''); 
   const [newImageUrl2, setNewImageUrl2] = useState(''); 
@@ -188,6 +187,8 @@ export default function Home() {
     shop_name: 'Zeenat Mart', 
     phone: '01632331534',
     logo_url: '',
+    flashDealActive: false,
+    endTime: Date.now() + 12 * 60 * 60 * 1000,
     bg_enabled: true,
     bg_opacity: 70,
     font_family: 'sans-serif',
@@ -426,6 +427,7 @@ export default function Home() {
           contact_info: safeCatBanners['TXT_CONTACT'] || prev.contact_info,
           return_policy: safeCatBanners['TXT_RETURN'] || prev.return_policy,
           delivery_policy: safeCatBanners['TXT_DELIVERY'] || prev.delivery_policy,
+          flashDealActive: safeCatBanners['FLASH_ACTIVE'] !== undefined ? safeCatBanners['FLASH_ACTIVE'] : false,
           bg_enabled: safeCatBanners['BG_ENABLED'] !== undefined ? safeCatBanners['BG_ENABLED'] : true,
           bg_opacity: safeCatBanners['BG_OPACITY'] !== undefined ? Number(safeCatBanners['BG_OPACITY']) : 70,
           font_family: safeCatBanners['FONT_FAMILY'] || 'sans-serif',
@@ -1121,7 +1123,6 @@ export default function Home() {
     setNewName(''); 
     setNewPrice(''); 
     setNewOriginalPrice(''); 
-    setNewCostPrice(''); 
     setNewStockCount(10);
     setNewImageUrl(''); 
     setNewImageUrl2(''); 
@@ -1143,7 +1144,6 @@ export default function Home() {
     setNewName(product.name || ''); 
     setNewPrice(product.price || ''); 
     setNewOriginalPrice(product.original_price || ''); 
-    setNewCostPrice(product.cost_price || ''); 
     setNewStockCount(product.stock_count || 0);
     setNewImageUrl(product.image_url || ''); 
     setNewImageUrl2(product.image_url_2 || ''); 
@@ -1184,7 +1184,7 @@ export default function Home() {
         name: newName || '', 
         price: newPrice, 
         original_price: newOriginalPrice || null, 
-        cost_price: newCostPrice || null, 
+        cost_price: null, 
         stock_count: newStockCount,
         image_url: newImageUrl || null, 
         image_url_2: newImageUrl2 || null, 
@@ -2171,7 +2171,7 @@ export default function Home() {
                 <button onClick={() => setAdminTab('abandoned')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'abandoned' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛒 Abandoned</button>
                 {isMasterAdmin && (
                   <>
-                    <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️️ Product List</button>
+                    <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Product List</button>
                     <button onClick={() => setAdminTab('customers')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'customers' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>👥 Customers</button>
                     <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Settings</button>
                   </>
@@ -2382,7 +2382,7 @@ export default function Home() {
                            </div>
                            <div className="flex-1 border border-[#D4AF37]/50 bg-[#FAF5EB] p-4 rounded-sm">
                               <p className="text-[10px] font-bold text-[#B8860B] uppercase tracking-widest leading-relaxed">
-                                 💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবেবিধা, সেগুলো অটোমেটিক নিচে চলে যাবে।
+                                 💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবে না, সেগুলো অটোমেটিক নিচে চলে যাবে।
                               </p>
                            </div>
                          </div>
@@ -2722,9 +2722,8 @@ export default function Home() {
                 <div><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Product Name (ঐচ্ছিক)</label><input value={newName} onChange={e => setNewName(e.target.value)} style={{fontFamily: storeSettings.font_family}} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
                 
                 <div className="flex gap-4">
-                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-gray-500 uppercase tracking-[0.2em]">Cost Price (Net Profit এর জন্য)</label><input value={newCostPrice} onChange={e => setNewCostPrice(e.target.value)} placeholder="e.g. 800" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
                   <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Regular Price (কাটা দাম)</label><input value={newOriginalPrice} onChange={e => setNewOriginalPrice(e.target.value)} placeholder="e.g. 1500" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
-                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-green-600 uppercase tracking-[0.2em]">Offer Price (বিক্রি দাম)</label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-green-500 shadow-inner transition-colors"/></div>
+                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-green-600 uppercase tracking-[0.2em]">Offer Price (বিক্রি দাম) <span className="text-red-500">*</span></label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-green-500 shadow-inner transition-colors"/></div>
                 </div>
                 
                 <div className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm">
