@@ -460,7 +460,8 @@ export default function Home() {
 
   const fetchOrders = async () => {
     try {
-      const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
       if (data) setOrders(data);
     } catch(err) {
       console.error(err);
@@ -469,7 +470,8 @@ export default function Home() {
 
   const fetchUserOrders = async (userId: string) => {
     try {
-      const { data } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false }); 
+      const { data, error } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false }); 
+      if (error) throw error;
       if (data) setUserOrders(data);
     } catch(err) {
       console.error(err);
@@ -478,7 +480,8 @@ export default function Home() {
 
   const fetchReviews = async (productId: string) => {
     try {
-      const { data } = await supabase.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
+      if (error) throw error;
       if (data) setProductReviews(data);
     } catch (error) {
       console.error(error);
@@ -545,7 +548,8 @@ export default function Home() {
      
      const newCatBanners = { ...storeSettings.category_banners, BLOCKLIST: newList };
      try {
-       await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+       const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+       if (error) throw error;
        setStoreSettings(prev => ({ ...prev, blocklist: newList, category_banners: newCatBanners }));
        showToast(currentList.includes(phone) ? "Customer unblocked!" : "Customer blocked successfully!", "success");
      } catch (e) { 
@@ -745,8 +749,8 @@ export default function Home() {
           if(abandonedDraftId) { 
             await supabase.from('orders').update(orderData).eq('id', abandonedDraftId); 
           } else { 
-            const { data } = await supabase.from('orders').insert([orderData]).select(); 
-            if(data && data[0]) setAbandonedDraftId(data[0].id); 
+            const { data, error } = await supabase.from('orders').insert([orderData]).select(); 
+            if(!error && data && data[0]) setAbandonedDraftId(data[0].id); 
           }
         } catch(e) {
           console.error("Failed to save draft:", e);
@@ -806,20 +810,23 @@ export default function Home() {
       let createdOrderId = '';
       
       if(abandonedDraftId) { 
-        const { data } = await supabase.from('orders').update(orderData).eq('id', abandonedDraftId).select(); 
+        const { data, error } = await supabase.from('orders').update(orderData).eq('id', abandonedDraftId).select(); 
+        if (error) throw error;
         createdOrderId = data && data[0] ? data[0].id : 'ORD_' + Date.now(); 
       } else { 
-        const { data } = await supabase.from('orders').insert([orderData]).select(); 
+        const { data, error } = await supabase.from('orders').insert([orderData]).select(); 
+        if (error) throw error;
         createdOrderId = data && data[0] ? data[0].id : 'ORD_' + Date.now(); 
       }
 
       for (const item of cart) {
          if (item.stock_count !== undefined) {
              const remain = item.stock_count - item.quantity;
-             await supabase.from('products').update({ 
+             const { error } = await supabase.from('products').update({ 
                stock_count: remain < 0 ? 0 : remain, 
                in_stock: remain > 0 
              }).eq('id', item.id);
+             if (error) console.error(error);
          }
       }
 
@@ -937,7 +944,8 @@ export default function Home() {
 
   const updateOrderStatus = async (id: string, newStatus: string) => { 
     try { 
-      await supabase.from('orders').update({ status: newStatus }).eq('id', id); 
+      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id); 
+      if (error) throw error;
       fetchOrders(); 
       showToast("স্ট্যাটাস আপডেট হয়েছে", "success"); 
     } catch(err) {
@@ -971,14 +979,17 @@ export default function Home() {
       const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(cleanFileName);
       
       if (type === 'logo') {
-        await supabase.from('store_settings').update({ logo_url: publicUrl }).eq('id', 1);
+        const { error } = await supabase.from('store_settings').update({ logo_url: publicUrl }).eq('id', 1);
+        if (error) throw error;
       } else if (type === 'banner' && index !== undefined) {
          let newBanners = [...storeSettings.banners];
          newBanners[index].imageUrl = publicUrl;
-         await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+         const { error } = await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+         if (error) throw error;
       } else if (type === 'website_bg') {
          const newCatBanners = { ...storeSettings.category_banners, ['WEBSITE_BG']: publicUrl };
-         await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+         const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+         if (error) throw error;
       } else if (type === 'custom_section' && catName) {
          setCustomSections(prev => prev.map(s => s.id === catName ? { ...s, imageUrl: publicUrl } : s));
          showToast("ব্যানার আপলোড হয়েছে! সেভ করুন।", "success"); 
@@ -1006,15 +1017,18 @@ export default function Home() {
     if (!window.confirm("মুছে ফেলতে চান?")) return;
     try {
       if (type === 'logo') {
-        await supabase.from('store_settings').update({ logo_url: '' }).eq('id', 1);
+        const { error } = await supabase.from('store_settings').update({ logo_url: '' }).eq('id', 1);
+        if (error) throw error;
       } else if (type === 'website_bg') {
         const newCatBanners = { ...storeSettings.category_banners }; 
         delete newCatBanners['WEBSITE_BG'];
-        await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+        const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+        if (error) throw error;
       } else if (type === 'banner' && index !== undefined) {
         let newBanners = [...storeSettings.banners]; 
         newBanners[index].imageUrl = '';
-        await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+        const { error } = await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+        if (error) throw error;
       }
       
       showToast("মুছে ফেলা হয়েছে!", "success"); 
@@ -1048,11 +1062,13 @@ export default function Home() {
          'STAFF_EMAILS': storeSettings.staff_emails
       };
       
-      await supabase.from('store_settings').update({ 
+      const { error } = await supabase.from('store_settings').update({ 
         shop_name: storeSettings.shop_name, 
         phone: storeSettings.phone, 
         category_banners: newCatBanners 
       }).eq('id', 1);
+      
+      if (error) throw error;
       
       showToast("সেটিংস সেভ হয়েছে!", "success"); 
       fetchSettings();
@@ -1078,10 +1094,12 @@ export default function Home() {
         return showToast("প্রোডাক্ট পাওয়া যায়নি!", "error"); 
       }
       
-      await supabase.from('products').update({ 
+      const { error } = await supabase.from('products').update({ 
         original_price: bulkOriginalPrice || null, 
         price: bulkOfferPrice 
       }).in('id', productsToUpdate.map(p => p.id));
+      
+      if (error) throw error;
       
       showToast(`আপডেট হয়েছে!`, "success"); 
       setBulkOriginalPrice(''); 
@@ -1152,7 +1170,8 @@ export default function Home() {
     if(e) e.stopPropagation(); 
     if (!window.confirm("ডিলিট করতে চান?")) return; 
     try { 
-      await supabase.from('products').delete().eq('id', id); 
+      const { error } = await supabase.from('products').delete().eq('id', id); 
+      if (error) throw error;
       fetchProducts(); 
       showToast("ডিলিট হয়েছে!", "success"); 
     } catch (error) {
@@ -1184,16 +1203,18 @@ export default function Home() {
       };
       
       if (editingProductId) {
-        await supabase.from('products').update(productData).eq('id', editingProductId); 
+        const { error } = await supabase.from('products').update(productData).eq('id', editingProductId); 
+        if (error) throw error;
       } else {
-        await supabase.from('products').insert([productData]);
+        const { error } = await supabase.from('products').insert([productData]);
+        if (error) throw error;
       }
       
       setShowProductModal(false); 
       fetchProducts(); 
       showToast("সেভ হয়েছে!", "success");
     } catch (error: any) { 
-      showToast("Error saving product", "error"); 
+      showToast("Error saving product: " + error.message, "error"); 
     } finally { 
       setIsSaving(false); 
     }
@@ -2152,7 +2173,7 @@ export default function Home() {
                   <>
                     <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Product List</button>
                     <button onClick={() => setAdminTab('customers')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'customers' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>👥 Customers</button>
-                    <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Settings</button>
+                    <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️️ Settings</button>
                   </>
                 )}
               </div>
