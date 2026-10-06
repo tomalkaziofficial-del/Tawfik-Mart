@@ -1420,6 +1420,17 @@ export default function Home() {
             </div>
           </header>
 
+          <div className="hidden md:flex justify-center items-center gap-8 py-3.5 bg-white border-b border-[#EADFC8] text-[11px] font-bold text-[#111412] uppercase tracking-[0.15em]">
+             <span className={`cursor-pointer transition-colors ${activeCategory === 'All' ? 'text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory('All'); closeProductModal(); window.scrollTo(0,0);}}>
+               সকল ক্যাটাগরি
+             </span>
+             {allCategoryOptions.map((cat, idx) => (
+                <span key={idx} className={`cursor-pointer transition-colors ${activeCategory === cat ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-[#D4AF37]'}`} onClick={() => {setActiveCategory(cat); closeProductModal(); window.scrollTo(0,0);}}>
+                  {cat}
+                </span>
+             ))}
+          </div>
+
           <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-8">
             
             {/* Banner Section Without Timer */}
@@ -1494,7 +1505,6 @@ export default function Home() {
                  });
 
                  return sortedCategoriesToRender.map(catTitle => {
-                    if (activeCategory === 'All' && specialCategories.includes(catTitle)) return null;
                     if (activeCategory !== 'All' && activeCategory !== catTitle) return null;
 
                     const section = customSections.find(s => s.title === catTitle);
@@ -1607,10 +1617,56 @@ export default function Home() {
         )}
       </main>
 
-      <div style={{ position: 'relative', zIndex: 99999 }}>
+      {/* Sidebar Modal Section (FIXED z-index) */}
+      {isSidebarOpen && (
+        <div style={{ position: 'relative', zIndex: 999999 }}>
+          <div className="fixed inset-0 bg-[#111412]/60 backdrop-blur-sm transition-opacity z-[999998]" onClick={() => setIsSidebarOpen(false)}></div>
+          <div className="fixed top-0 left-0 w-[280px] md:w-[320px] h-full bg-[#FAF5EB] shadow-[5px_0_30px_rgba(0,0,0,0.5)] flex flex-col transform transition-transform duration-300 border-r border-[#D4AF37]/50 z-[999999]">
+            <div className="p-5 flex justify-between items-center bg-[#111412] text-[#D4AF37] shadow-sm border-b border-[#D4AF37]/30">
+              <div className="flex items-center gap-3">
+                 <div className="relative flex items-center justify-center p-1">
+                   <div className="absolute inset-0 rounded-full border-l-[2px] border-b-[2px] border-[#D4AF37] shadow-[-2px_2px_5px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
+                   <div className="w-8 h-8 bg-[#111412] flex items-center justify-center font-bold text-lg rounded-full overflow-hidden relative">
+                     {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover"/> : <span className="text-[#D4AF37]">🌙</span>}
+                   </div>
+                 </div>
+                 <span className="font-bold text-xs uppercase tracking-[0.2em] italic" style={{ color: storeSettings.brand_name_color || '#D4AF37' }}>{storeSettings.shop_name}</span>
+              </div>
+              <button onClick={() => setIsSidebarOpen(false)} className="text-[#D4AF37] hover:text-white text-2xl font-bold bg-transparent w-8 h-8 flex items-center justify-center rounded transition-colors">✕</button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto custom-scrollbar py-6 text-[12px] font-bold text-[#111412] uppercase tracking-widest">
+               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => {setActiveCategory('All'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}><span>✦</span> হোম</div>
+               
+               <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
+               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black flex items-center gap-2 mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>ক্যাটাগরি সমূহ</div>
+               {dynamicSidebarCategories.map((cat, i) => (
+                 <div key={i} className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#111412]" onClick={() => {setActiveCategory(cat); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0,0);}}>
+                   <span className="text-[10px] text-[#D4AF37]">▶</span> {cat}
+                 </div>
+               ))}
+               
+               <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
+               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>প্রয়োজনীয় লিংক</div>
+               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({title: 'যোগাযোগ', content: storeSettings.contact_info}); setIsSidebarOpen(false); }}>
+                  <span>✉</span> যোগাযোগ
+               </div>
+               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({title: 'রিটার্ন পলিসি', content: storeSettings.return_policy}); setIsSidebarOpen(false); }}>
+                  <span>🛡</span> রিটার্ন পলিসি
+               </div>
+               
+               <div className="mt-10 mx-5 px-4 py-4 bg-[#111412] text-[#D4AF37] text-center rounded-sm shadow-md font-bold tracking-[0.2em] cursor-pointer border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300">
+                  📞 {storeSettings.phone}
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ position: 'relative', zIndex: 999999 }}>
         {toastMessage && ( 
           <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.2)] z-[999999] flex items-center gap-3 animate-bounce-short text-xs font-black tracking-widest text-white uppercase ${toastMessage.type === 'success' ? 'bg-[#111412] border border-[#D4AF37]' : 'bg-red-600 border border-white'}`}>
-            <span className="text-lg">{toastMessage.type === 'success' ? '✅' : '⚠️'}</span>
+            <span className="text-lg">{toastMessage.type === 'success' ? '✅' : '⚠'}</span>
             {toastMessage.msg}
           </div> 
         )}
@@ -2115,6 +2171,16 @@ export default function Home() {
                   const cancelledOrders = orders.filter(o => o.status === 'CANCELLED');
                   
                   const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+                  
+                  // NET PROFIT CALCULATION
+                  const totalProfit = deliveredOrders.reduce((sum, order) => {
+                     const orderProfit = (order.items || []).reduce((itemSum, item) => {
+                         const cost = 0;
+                         const sellPrice = getNumericPrice(item.price);
+                         return itemSum + ((sellPrice - cost) * item.quantity);
+                     }, 0);
+                     return sum + orderProfit;
+                  }, 0);
 
                   // CHARTS DATA
                   const pieData = [
@@ -2134,7 +2200,12 @@ export default function Home() {
                     <div className="space-y-10">
                        <h3 className="font-bold text-xl mb-4 text-[#111412] tracking-[0.2em] uppercase border-b border-[#EADFC8] pb-4">Business Analytics Overview</h3>
                        
-                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                          <div className="bg-gradient-to-br from-[#111412] to-[#2a2a2a] p-6 rounded-md shadow-lg border border-[#D4AF37]">
+                             <p className="text-[10px] text-[#EADFC8] font-bold uppercase tracking-widest mb-2">Net Profit (Delivered)</p>
+                             <p className="text-3xl font-black text-[#D4AF37]">৳ {totalProfit.toLocaleString()}</p>
+                             <p className="text-[9px] mt-2 text-gray-400">After deducting cost prices</p>
+                          </div>
                           <div className="bg-white p-6 rounded-md shadow-md border border-[#EADFC8]">
                              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Total Revenue</p>
                              <p className="text-3xl font-black text-[#111412]">৳ {totalRevenue.toLocaleString()}</p>
@@ -2567,9 +2638,28 @@ export default function Home() {
                       <h3 className="font-bold text-sm text-[#111412] tracking-[0.2em] uppercase">All Products ({products.length})</h3>
                       <input type="text" placeholder="Search by Name or ID..." value={adminSearchQuery} onChange={e => setAdminSearchQuery(e.target.value)} className="w-full md:w-1/3 bg-white border border-[#EADFC8] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                      {filteredAdminProducts.length > 0 ? ( filteredAdminProducts.map(item => renderProductCard(item, true)) ) : ( <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found matching your search</p> )}
-                    </div>
+                    
+                    {filteredAdminProducts.length > 0 ? (
+                       Object.entries(
+                         filteredAdminProducts.reduce((acc, product) => {
+                           const primaryCategory = product.category ? product.category.split(',')[0].trim() : 'Uncategorized';
+                           if (!acc[primaryCategory]) acc[primaryCategory] = [];
+                           acc[primaryCategory].push(product);
+                           return acc;
+                         }, {} as Record<string, Product[]>)
+                       ).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([category, catProds]) => (
+                          <div key={category} className="mb-10 bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm">
+                             <h4 className="font-bold text-lg text-[#111412] border-b-2 border-[#D4AF37] pb-2 mb-6 uppercase tracking-[0.15em]">
+                                {category} <span className="text-[#D4AF37] text-sm ml-2">({catProds.length} Products)</span>
+                             </h4>
+                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                                {catProds.map(item => renderProductCard(item, true))}
+                             </div>
+                          </div>
+                       ))
+                    ) : (
+                       <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest bg-white border border-[#EADFC8] rounded-sm">No products found matching your search</p>
+                    )}
                   </div>
                 )}
 
@@ -2618,7 +2708,7 @@ export default function Home() {
                 
                 <div className="flex gap-4">
                   <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Regular Price (কাটা দাম)</label><input value={newOriginalPrice} onChange={e => setNewOriginalPrice(e.target.value)} placeholder="e.g. 1500" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors"/></div>
-                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-green-600 uppercase tracking-[0.2em]">Offer Price (বিক্রি দাম)</label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-green-500 shadow-inner transition-colors"/></div>
+                  <div className="flex-1"><label className="block text-[10px] font-bold mb-2 text-green-600 uppercase tracking-[0.2em]">Offer Price (বিক্রি দাম) <span className="text-red-500">*</span></label><input required value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="e.g. 1200" className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-green-500 shadow-inner transition-colors"/></div>
                 </div>
                 
                 <div className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm">
