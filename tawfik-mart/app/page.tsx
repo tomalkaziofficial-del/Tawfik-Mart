@@ -458,7 +458,8 @@ export default function Home() {
 
   const fetchOrders = async () => {
     try {
-      const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
       if (data) setOrders(data);
     } catch(err) {
       console.error(err);
@@ -467,7 +468,8 @@ export default function Home() {
 
   const fetchUserOrders = async (userId: string) => {
     try {
-      const { data } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false }); 
+      const { data, error } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false }); 
+      if (error) throw error;
       if (data) setUserOrders(data);
     } catch(err) {
       console.error(err);
@@ -476,7 +478,8 @@ export default function Home() {
 
   const fetchReviews = async (productId: string) => {
     try {
-      const { data } = await supabase.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
+      if (error) throw error;
       if (data) setProductReviews(data);
     } catch (error) {
       console.error(error);
@@ -543,7 +546,8 @@ export default function Home() {
      
      const newCatBanners = { ...storeSettings.category_banners, BLOCKLIST: newList };
      try {
-       await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+       const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+       if (error) throw error;
        setStoreSettings(prev => ({ ...prev, blocklist: newList, category_banners: newCatBanners }));
        showToast(currentList.includes(phone) ? "Customer unblocked!" : "Customer blocked successfully!", "success");
      } catch (e) { 
@@ -743,8 +747,8 @@ export default function Home() {
           if(abandonedDraftId) { 
             await supabase.from('orders').update(orderData).eq('id', abandonedDraftId); 
           } else { 
-            const { data } = await supabase.from('orders').insert([orderData]).select(); 
-            if(data && data[0]) setAbandonedDraftId(data[0].id); 
+            const { data, error } = await supabase.from('orders').insert([orderData]).select(); 
+            if(!error && data && data[0]) setAbandonedDraftId(data[0].id); 
           }
         } catch(e) {
           console.error("Failed to save draft:", e);
@@ -804,20 +808,23 @@ export default function Home() {
       let createdOrderId = '';
       
       if(abandonedDraftId) { 
-        const { data } = await supabase.from('orders').update(orderData).eq('id', abandonedDraftId).select(); 
+        const { data, error } = await supabase.from('orders').update(orderData).eq('id', abandonedDraftId).select(); 
+        if (error) throw error;
         createdOrderId = data && data[0] ? data[0].id : 'ORD_' + Date.now(); 
       } else { 
-        const { data } = await supabase.from('orders').insert([orderData]).select(); 
+        const { data, error } = await supabase.from('orders').insert([orderData]).select(); 
+        if (error) throw error;
         createdOrderId = data && data[0] ? data[0].id : 'ORD_' + Date.now(); 
       }
 
       for (const item of cart) {
          if (item.stock_count !== undefined) {
              const remain = item.stock_count - item.quantity;
-             await supabase.from('products').update({ 
+             const { error } = await supabase.from('products').update({ 
                stock_count: remain < 0 ? 0 : remain, 
                in_stock: remain > 0 
              }).eq('id', item.id);
+             if (error) console.error(error);
          }
       }
 
@@ -935,7 +942,8 @@ export default function Home() {
 
   const updateOrderStatus = async (id: string, newStatus: string) => { 
     try { 
-      await supabase.from('orders').update({ status: newStatus }).eq('id', id); 
+      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id); 
+      if (error) throw error;
       fetchOrders(); 
       showToast("স্ট্যাটাস আপডেট হয়েছে", "success"); 
     } catch(err) {
@@ -969,14 +977,17 @@ export default function Home() {
       const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(cleanFileName);
       
       if (type === 'logo') {
-        await supabase.from('store_settings').update({ logo_url: publicUrl }).eq('id', 1);
+        const { error } = await supabase.from('store_settings').update({ logo_url: publicUrl }).eq('id', 1);
+        if (error) throw error;
       } else if (type === 'banner' && index !== undefined) {
          let newBanners = [...storeSettings.banners];
          newBanners[index].imageUrl = publicUrl;
-         await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+         const { error } = await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+         if (error) throw error;
       } else if (type === 'website_bg') {
          const newCatBanners = { ...storeSettings.category_banners, ['WEBSITE_BG']: publicUrl };
-         await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+         const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+         if (error) throw error;
       } else if (type === 'custom_section' && catName) {
          setCustomSections(prev => prev.map(s => s.id === catName ? { ...s, imageUrl: publicUrl } : s));
          showToast("ব্যানার আপলোড হয়েছে! সেভ করুন।", "success"); 
@@ -1004,15 +1015,18 @@ export default function Home() {
     if (!window.confirm("মুছে ফেলতে চান?")) return;
     try {
       if (type === 'logo') {
-        await supabase.from('store_settings').update({ logo_url: '' }).eq('id', 1);
+        const { error } = await supabase.from('store_settings').update({ logo_url: '' }).eq('id', 1);
+        if (error) throw error;
       } else if (type === 'website_bg') {
         const newCatBanners = { ...storeSettings.category_banners }; 
         delete newCatBanners['WEBSITE_BG'];
-        await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+        const { error } = await supabase.from('store_settings').update({ category_banners: newCatBanners }).eq('id', 1);
+        if (error) throw error;
       } else if (type === 'banner' && index !== undefined) {
         let newBanners = [...storeSettings.banners]; 
         newBanners[index].imageUrl = '';
-        await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+        const { error } = await supabase.from('store_settings').update({ banners: newBanners }).eq('id', 1);
+        if (error) throw error;
       }
       
       showToast("মুছে ফেলা হয়েছে!", "success"); 
@@ -1046,11 +1060,13 @@ export default function Home() {
          'STAFF_EMAILS': storeSettings.staff_emails
       };
       
-      await supabase.from('store_settings').update({ 
+      const { error } = await supabase.from('store_settings').update({ 
         shop_name: storeSettings.shop_name, 
         phone: storeSettings.phone, 
         category_banners: newCatBanners 
       }).eq('id', 1);
+      
+      if (error) throw error;
       
       showToast("সেটিংস সেভ হয়েছে!", "success"); 
       fetchSettings();
@@ -1076,10 +1092,12 @@ export default function Home() {
         return showToast("প্রোডাক্ট পাওয়া যায়নি!", "error"); 
       }
       
-      await supabase.from('products').update({ 
+      const { error } = await supabase.from('products').update({ 
         original_price: bulkOriginalPrice || null, 
         price: bulkOfferPrice 
       }).in('id', productsToUpdate.map(p => p.id));
+      
+      if (error) throw error;
       
       showToast(`আপডেট হয়েছে!`, "success"); 
       setBulkOriginalPrice(''); 
@@ -1148,7 +1166,8 @@ export default function Home() {
     if(e) e.stopPropagation(); 
     if (!window.confirm("ডিলিট করতে চান?")) return; 
     try { 
-      await supabase.from('products').delete().eq('id', id); 
+      const { error } = await supabase.from('products').delete().eq('id', id); 
+      if (error) throw error;
       fetchProducts(); 
       showToast("ডিলিট হয়েছে!", "success"); 
     } catch (error) {
@@ -1206,11 +1225,10 @@ export default function Home() {
     setActiveSubCategories(prev => ({ ...prev, [catName]: subName })); 
   };
 
-  const specialCategories = ["⚡ ফ্লাশ সেল", "নতুন কালেকশন", "এক্সক্লুসিভ", "সকল ব্র্যান্ড"];
   const allDynamicCats = products.flatMap(p => (p.category || '').split(',').map(c=>c.trim())).filter(Boolean);
   const dynamicSidebarCategories = Array.from(new Set([...customSections.map(c => c.title), ...allDynamicCats]));
   
-  const allCategoryOptions = Array.from(new Set([...specialCategories, ...dynamicSidebarCategories]));
+  const allCategoryOptions = Array.from(new Set([...dynamicSidebarCategories]));
 
   const filteredProducts = products.filter(item => 
     (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -1908,7 +1926,7 @@ export default function Home() {
                        </label>
                        <label className="flex items-center gap-3 text-sm text-[#111412] font-bold cursor-pointer">
                          <input type="radio" name="shipping" checked={shippingLocation==='outside'} onChange={()=>setShippingLocation('outside')} className="accent-[#D4AF37] w-4 h-4 cursor-pointer" />
-                         <span>ঢাকার বাইরে {isFreeDelivery ? <><del className="text-gray-400">৳ ১২0</del> <span className="text-green-600 bg-green-100 px-2 rounded-sm ml-1 text-xs">FREE</span></> : '(৳ ১২০)'}</span>
+                         <span>ঢাকার বাইরে {isFreeDelivery ? <><del className="text-gray-400">৳ ১২০</del> <span className="text-green-600 bg-green-100 px-2 rounded-sm ml-1 text-xs">FREE</span></> : '(৳ ১২০)'}</span>
                        </label>
                     </div>
                   </div>
@@ -2180,10 +2198,10 @@ export default function Home() {
                   
                   const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
                   
-                  // NET PROFIT CALCULATION (Total Rev - Total Cost)
+                  // NET PROFIT CALCULATION
                   const totalProfit = deliveredOrders.reduce((sum, order) => {
                      const orderProfit = (order.items || []).reduce((itemSum, item) => {
-                         const cost = 0; // Removed cost_price
+                         const cost = 0;
                          const sellPrice = getNumericPrice(item.price);
                          return itemSum + ((sellPrice - cost) * item.quantity);
                      }, 0);
@@ -2375,7 +2393,7 @@ export default function Home() {
                            </div>
                            <div className="flex-1 border border-[#D4AF37]/50 bg-[#FAF5EB] p-4 rounded-sm">
                               <p className="text-[10px] font-bold text-[#B8860B] uppercase tracking-widest leading-relaxed">
-                                 💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবে না, সেগুলো অটোমেটিক নিচে চলে যাবে।
+                                 💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবেবিধা না, সেগুলো অটোমেটিক নিচে চলে যাবে।
                               </p>
                            </div>
                          </div>
