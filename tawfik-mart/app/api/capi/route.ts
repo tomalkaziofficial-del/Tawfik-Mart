@@ -32,6 +32,7 @@ export async function POST(req: Request) {
           },
         },
       ],
+      test_event_code: 'TEST8666'
     };
 
     const response = await fetch(
