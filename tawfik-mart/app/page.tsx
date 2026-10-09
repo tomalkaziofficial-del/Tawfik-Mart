@@ -773,6 +773,7 @@ export default function Home() {
     await processOrderExecution(finalPaymentMethodText);
   };
 
+  // --- মেটা পিক্সেল এবং CAPI ফিক্সড ফাংশন ---
   const processOrderExecution = async (payMethodType: string) => {
     setIsCheckingOut(true);
     let userIp = 'Unknown'; 
@@ -828,6 +829,7 @@ export default function Home() {
          }
       }
 
+      // --- Pixel & CAPI Deduplication Setup Start (100% Fixed) ---
       if (typeof window !== 'undefined' && (window as any).fbq) { 
         (window as any).fbq('track', 'Purchase', { 
           value: cartTotal, 
@@ -837,6 +839,27 @@ export default function Home() {
           num_items: totalItemsCount 
         }, { eventID: createdOrderId }); 
       }
+
+      try {
+        await fetch('/api/capi', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            eventName: 'Purchase',
+            eventID: createdOrderId, 
+            value: cartTotal,
+            currency: 'BDT',
+            ip: userIp,
+            userAgent: navigator.userAgent, 
+            phone: customerPhone, 
+          }),
+        });
+      } catch (capiError) {
+        console.error("CAPI Error:", capiError);
+      }
+      // --- Pixel & CAPI Deduplication Setup End ---
       
       if (user && user.id) {
         fetchUserOrders(user.id);
