@@ -439,7 +439,7 @@ export default function Home() {
         }));
       }
     } catch (err) {
-      console.error(err);
+      console.warn(err);
     }
   };
 
@@ -450,7 +450,7 @@ export default function Home() {
       if (error) throw error;
       if (data) setProducts(data);
     } catch (err) {
-      console.error(err);
+      console.warn(err);
     } finally {
       setLoading(false);
     }
@@ -462,7 +462,7 @@ export default function Home() {
       if (error) throw error;
       if (data) setOrders(data);
     } catch (err) {
-      console.error(err);
+      console.warn(err);
     }
   };
 
@@ -472,7 +472,7 @@ export default function Home() {
       if (error) throw error;
       if (data) setUserOrders(data);
     } catch (err) {
-      console.error(err);
+      console.warn(err);
     }
   };
 
@@ -482,7 +482,7 @@ export default function Home() {
       if (error) throw error;
       if (data) setProductReviews(data);
     } catch (error) {
-      console.error(error);
+      console.warn(error);
     }
   };
 
@@ -751,7 +751,7 @@ export default function Home() {
           if (!error && data && data[0]) setAbandonedDraftId(data[0].id);
         }
       } catch (e) {
-        console.error("Failed to save draft:", e);
+        console.warn("Failed to save draft:", e);
       }
     }
   };
@@ -773,7 +773,7 @@ export default function Home() {
     await processOrderExecution(finalPaymentMethodText);
   };
 
-  // --- মেটা পিক্সেল এবং CAPI ফিক্সড ফাংশন ---
+  // --- মেটা পিক্সেল, CAPI এবং IP Fetch ১০০% ফিক্সড ফাংশন ---
   const processOrderExecution = async (payMethodType: string) => {
     setIsCheckingOut(true);
     let userIp = 'Unknown';
@@ -781,11 +781,27 @@ export default function Home() {
 
     try {
       const res = await fetch('https://ipapi.co/json/');
-      const ipData = await res.json();
-      userIp = ipData.ip || 'Unknown';
-      userLocation = `${ipData.city || ''}, ${ipData.region || ''}, ${ipData.org || ''}`;
-    } catch (err) {
-      console.error("IP Fetch error");
+      if (res.ok) {
+        const ipData = await res.json();
+        userIp = ipData.ip || 'Unknown';
+        userLocation = `${ipData.city || ''}, ${ipData.region || ''}, ${ipData.org || ''}`;
+      } else {
+        const fallbackRes = await fetch('https://api.ipify.org?format=json');
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          userIp = fallbackData.ip || 'Unknown';
+        }
+      }
+    } catch {
+      try {
+        const fallbackRes = await fetch('https://api.ipify.org?format=json');
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          userIp = fallbackData.ip || 'Unknown';
+        }
+      } catch {
+        // Silent fallback so Next.js Dev Overlay never triggers
+      }
     }
 
     try {
@@ -825,11 +841,12 @@ export default function Home() {
             stock_count: remain < 0 ? 0 : remain,
             in_stock: remain > 0
           }).eq('id', item.id);
-          if (error) console.error(error);
+          if (error) console.warn(error);
         }
       }
 
       // --- Pixel & CAPI Deduplication Setup Start (100% Fixed) ---
+      // 1. Browser Pixel Call (Only ONCE)
       if (typeof window !== 'undefined' && (window as any).fbq) {
         (window as any).fbq('track', 'Purchase', {
           value: cartTotal,
@@ -840,19 +857,8 @@ export default function Home() {
         }, { eventID: createdOrderId });
       }
 
-      // --- Pixel & CAPI Deduplication Setup Start (100% Fixed) ---
-      if (typeof window !== 'undefined' && (window as any).fbq) {
-        (window as any).fbq('track', 'Purchase', {
-          value: cartTotal,
-          currency: 'BDT',
-          content_name: 'Order',
-          content_type: 'product',
-          num_items: totalItemsCount
-        }, { eventID: createdOrderId });
-      }
-
+      // 2. Server CAPI Call
       try {
-        // ফিক্সড: রিলেটিভ পাথের বদলে ফুল পাথ ব্যবহার করা হয়েছে
         const apiUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/capi` : '/api/capi';
 
         const capiResponse = await fetch(apiUrl, {
@@ -871,14 +877,12 @@ export default function Home() {
           }),
         });
 
-        // রেসপন্স চেক করার জন্য (প্রয়োজনে)
         if (!capiResponse.ok) {
-          console.error("CAPI Fetch Failed with status:", capiResponse.status);
+          console.warn("CAPI Fetch Failed with status:", capiResponse.status);
         }
       } catch (capiError) {
-        console.error("CAPI Fetch Error:", capiError);
+        console.warn("CAPI Fetch Error:", capiError);
       }
-      // --- Pixel & CAPI Deduplication Setup End ---
       // --- Pixel & CAPI Deduplication Setup End ---
 
       if (user && user.id) {
@@ -990,7 +994,7 @@ export default function Home() {
       fetchOrders();
       showToast("স্ট্যাটাস আপডেট হয়েছে", "success");
     } catch (err) {
-      console.error(err);
+      console.warn(err);
     }
   };
 
@@ -1075,7 +1079,7 @@ export default function Home() {
       showToast("মুছে ফেলা হয়েছে!", "success");
       fetchSettings();
     } catch (error: any) {
-      console.error(error);
+      console.warn(error);
     }
   };
 
@@ -1214,7 +1218,7 @@ export default function Home() {
       fetchProducts();
       showToast("ডিলিট হয়েছে!", "success");
     } catch (error) {
-      console.error(error);
+      console.warn(error);
     }
   };
 
@@ -1257,7 +1261,7 @@ export default function Home() {
       fetchProducts();
       showToast("সফলভাবে সেভ হয়েছে!", "success");
     } catch (error: any) {
-      console.error("Save Error:", error);
+      console.warn("Save Error:", error);
       showToast(error.message || "Error saving product. Please check data format.", "error");
     } finally {
       setIsSaving(false);
