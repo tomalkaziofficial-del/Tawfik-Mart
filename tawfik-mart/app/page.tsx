@@ -179,7 +179,7 @@ export default function Home() {
   const [customSections, setCustomSections] = useState<{ id: string, title: string, fontSize: number, imageUrl: string, color?: string, imageHeight?: number }[]>([]);
 
   const [toastMessage, setToastMessage] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
-  const [orderSuccess, setOrderSuccess] = useState<{ show: boolean, orderId: string }>({ show: false, orderId: '' });
+  const [orderSuccess, setOrderSuccess] = useState<{ show: boolean, orderId: string, items?: CartItem[], total?: number, phone?: string }>({ show: false, orderId: '', items: [], total: 0, phone: '' });
   const [fomoMsg, setFomoMsg] = useState<Product | null>(null);
   const [animateCart, setAnimateCart] = useState(false);
 
@@ -220,6 +220,34 @@ export default function Home() {
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ msg, type });
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // ওপেন ট্র্যাকিং ও আমার অর্ডার মডাল (অটোমেটিক কাস্টমারের লাস্ট ফোন নম্বর দিয়ে অর্ডার লোড করবে)
+  const openMyOrdersModal = async (phoneToTrack?: string) => {
+    setShowTrackingModal(true);
+    const savedPhone = phoneToTrack || (typeof window !== 'undefined' ? localStorage.getItem('zeenatLastOrderPhone') || '' : '');
+    if (savedPhone) {
+      setTrackingPhone(savedPhone);
+      setIsTracking(true);
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('customer_phone', savedPhone)
+          .neq('status', 'ABANDONED_CART')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          setTrackedOrders(data);
+        }
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setIsTracking(false);
+      }
+    } else {
+      setTrackedOrders(null);
+      setTrackingPhone('');
+    }
   };
 
   const openProductModal = (product: Product) => {
@@ -317,6 +345,9 @@ export default function Home() {
       const savedWishlist = localStorage.getItem('trendifyWishlist');
       if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
       setIsWishlistLoaded(true);
+
+      const savedLastPhone = localStorage.getItem('zeenatLastOrderPhone');
+      if (savedLastPhone) setTrackingPhone(savedLastPhone);
     }
 
     supabase.auth.getSession().then(({ data: { session } }: any) => {
@@ -468,7 +499,7 @@ export default function Home() {
 
   const fetchUserOrders = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('orders').select('*').eq('user_id', userId).neq('status', 'ABANDONED_CART').order('created_at', { ascending: false });
       if (error) throw error;
       if (data) setUserOrders(data);
     } catch (err) {
@@ -519,12 +550,12 @@ export default function Home() {
   }, [orders]);
 
   const getFraudBadge = (phone: string, ip?: string) => {
-    const userOrders = orders.filter(o => (o.customer_phone === phone || (ip && o.ip_address === ip)) && o.status !== 'ABANDONED_CART');
-    const total = userOrders.length;
+    const userOrdersList = orders.filter(o => (o.customer_phone === phone || (ip && o.ip_address === ip)) && o.status !== 'ABANDONED_CART');
+    const total = userOrdersList.length;
     if (total === 0) return { label: '🟡 New Customer', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
 
-    const delivered = userOrders.filter(o => o.status === 'DELIVERED').length;
-    const cancelled = userOrders.filter(o => o.status === 'CANCELLED').length;
+    const delivered = userOrdersList.filter(o => o.status === 'DELIVERED').length;
+    const cancelled = userOrdersList.filter(o => o.status === 'CANCELLED').length;
 
     if (cancelled > 0 && (cancelled / total) >= 0.5) {
       return { label: '🔴 High Risk / Fraud', color: 'bg-red-100 text-red-800 border-red-300' };
@@ -800,11 +831,15 @@ export default function Home() {
           userIp = fallbackData.ip || 'Unknown';
         }
       } catch {
-        // Silent fallback so Next.js Dev Overlay never triggers
+        // Silent fallback
       }
     }
 
     try {
+      const orderedItemsSnapshot = [...cart];
+      const orderedTotalSnapshot = cartTotal;
+      const orderedPhoneSnapshot = customerPhone;
+
       const orderData: any = {
         customer_name: customerName,
         customer_phone: customerPhone,
@@ -845,8 +880,13 @@ export default function Home() {
         }
       }
 
-      // --- Pixel & CAPI Deduplication Setup Start (100% Fixed) ---
-      // 1. Browser Pixel Call (Only ONCE)
+      // Save customer phone in localStorage so they can view their ordered items anytime
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('zeenatLastOrderPhone', orderedPhoneSnapshot);
+      }
+      setTrackingPhone(orderedPhoneSnapshot);
+
+      // --- Pixel & CAPI Deduplication Setup Start ---
       if (typeof window !== 'undefined' && (window as any).fbq) {
         (window as any).fbq('track', 'Purchase', {
           value: cartTotal,
@@ -857,7 +897,6 @@ export default function Home() {
         }, { eventID: createdOrderId });
       }
 
-      // 2. Server CAPI Call
       try {
         const apiUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/capi` : '/api/capi';
 
@@ -897,7 +936,13 @@ export default function Home() {
       setCustomerAddress('');
       setTransactionId('');
       setAbandonedDraftId(null);
-      setOrderSuccess({ show: true, orderId: createdOrderId.split('-')[0] });
+      setOrderSuccess({
+        show: true,
+        orderId: createdOrderId.split('-')[0],
+        items: orderedItemsSnapshot,
+        total: orderedTotalSnapshot,
+        phone: orderedPhoneSnapshot
+      });
       fetchProducts();
 
     } catch (error: any) {
@@ -955,7 +1000,15 @@ export default function Home() {
     if (!trackingPhone) return;
     setIsTracking(true);
     try {
-      const { data, error } = await supabase.from('orders').select('*').eq('customer_phone', trackingPhone).order('created_at', { ascending: false });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('zeenatLastOrderPhone', trackingPhone.trim());
+      }
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_phone', trackingPhone.trim())
+        .neq('status', 'ABANDONED_CART')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       setTrackedOrders(data || []);
     } catch (error) {
@@ -1000,13 +1053,13 @@ export default function Home() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PENDING': return 'text-yellow-600 bg-yellow-100 border border-yellow-300';
-      case 'CONFIRMED': return 'text-blue-600 bg-blue-100 border border-blue-300';
-      case 'PROCESSING': return 'text-purple-600 bg-purple-100 border border-purple-300';
-      case 'SHIPPED': return 'text-cyan-600 bg-cyan-100 border border-cyan-300';
-      case 'DELIVERED': return 'text-green-600 bg-green-100 border border-green-300';
-      case 'CANCELLED': return 'text-red-600 bg-red-100 border border-red-300';
-      default: return 'text-gray-600 bg-gray-100 border border-gray-300';
+      case 'PENDING': return 'text-yellow-700 bg-yellow-100 border border-yellow-300';
+      case 'CONFIRMED': return 'text-blue-700 bg-blue-100 border border-blue-300';
+      case 'PROCESSING': return 'text-purple-700 bg-purple-100 border border-purple-300';
+      case 'SHIPPED': return 'text-cyan-700 bg-cyan-100 border border-cyan-300';
+      case 'DELIVERED': return 'text-green-700 bg-green-100 border border-green-300';
+      case 'CANCELLED': return 'text-red-700 bg-red-100 border border-red-300';
+      default: return 'text-gray-700 bg-gray-100 border border-gray-300';
     }
   };
 
@@ -1302,6 +1355,9 @@ export default function Home() {
   const bgImage = storeSettings.category_banners?.['WEBSITE_BG'];
   const isBgVisible = storeSettings.bg_enabled && bgImage;
 
+  const cleanWhatsAppPhone = storeSettings.phone.replace(/[^0-9]/g, '');
+  const formattedWaPhone = cleanWhatsAppPhone.startsWith('88') ? cleanWhatsAppPhone : `88${cleanWhatsAppPhone}`;
+
   const renderProductCard = (item: Product, isAdminView: boolean = false) => {
     const discount = item.original_price ? calculateDiscount(item.original_price, item.price) : 0;
     const inWishlist = wishlist.some(w => w.id === item.id);
@@ -1314,14 +1370,14 @@ export default function Home() {
         onClick={() => !isSoldOut && openProductModal(item)}
       >
         {isSoldOut && (
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-red-600 text-white font-black px-4 py-2 rounded shadow-2xl rotate-[-15deg] uppercase tracking-widest text-sm border-2 border-white">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-red-600 text-white font-black px-3 py-1.5 rounded shadow-2xl rotate-[-15deg] uppercase tracking-widest text-xs border-2 border-white">
             SOLD OUT
           </div>
         )}
 
         {discount > 0 && !isSoldOut && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-[11px] font-bold rounded-full w-10 h-10 flex flex-col items-center justify-center z-10 leading-tight shadow-md border-2 border-white">
-            {discount}%<span className="text-[8px] font-normal">ছাড়</span>
+          <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] md:text-[11px] font-bold rounded-full w-9 h-9 md:w-10 md:h-10 flex flex-col items-center justify-center z-10 leading-tight shadow-md border-2 border-white">
+            {discount}%<span className="text-[7px] md:text-[8px] font-normal">ছাড়</span>
           </div>
         )}
 
@@ -1329,7 +1385,7 @@ export default function Home() {
           onClick={(e) => toggleWishlist(item, e)}
           className="absolute top-2 left-2 z-10 bg-white/80 backdrop-blur-md p-1.5 rounded-full hover:bg-white border border-[#EADFC8] shadow-sm transition"
         >
-          {inWishlist ? <span className="text-red-500 text-sm">❤</span> : <span className="text-gray-400 text-sm hover:text-[#D4AF37]">🤍</span>}
+          {inWishlist ? <span className="text-red-500 text-xs md:text-sm">❤</span> : <span className="text-gray-400 text-xs md:text-sm hover:text-[#D4AF37]">🤍</span>}
         </button>
 
         {isAdminView && isMasterAdmin && (
@@ -1339,35 +1395,36 @@ export default function Home() {
           </div>
         )}
 
-        <div className="w-full bg-[#FAF5EB] relative overflow-hidden flex items-center justify-center border-b border-[#EADFC8] h-[240px]">
+        {/* Mobile-friendly optimized image container */}
+        <div className="w-full bg-[#FAF5EB] relative overflow-hidden flex items-center justify-center border-b border-[#EADFC8] h-[185px] sm:h-[210px] md:h-[240px]">
           {item.image_url ? (
-            <img src={item.image_url} loading="lazy" decoding="async" className={`w-full h-full object-cover absolute inset-0 transition-transform duration-700 ease-in-out ${isSoldOut ? 'grayscale' : 'group-hover:scale-105'}`} />
+            <img src={item.image_url} loading="lazy" decoding="async" alt={item.name} className={`w-full h-full object-cover absolute inset-0 transition-transform duration-700 ease-in-out ${isSoldOut ? 'grayscale' : 'group-hover:scale-105'}`} />
           ) : (
             <span className="text-gray-400 text-xs font-medium">No Image</span>
           )}
         </div>
 
-        <div className="p-4 flex flex-col items-center text-center flex-grow bg-white">
-          <p className="text-[9px] text-[#D4AF37] font-bold uppercase tracking-[0.2em] mb-1.5">{item.tag || item.category.split(',')[0]}</p>
-          {item.name && item.name !== '' && <h4 className="text-[13px] text-[#111412] font-bold mb-2 line-clamp-1">{item.name}</h4>}
+        <div className="p-2.5 md:p-4 flex flex-col items-center text-center flex-grow bg-white">
+          <p className="text-[8px] md:text-[9px] text-[#D4AF37] font-bold uppercase tracking-[0.15em] mb-1 line-clamp-1">{item.tag || item.category.split(',')[0]}</p>
+          {item.name && item.name !== '' && <h4 className="text-[12px] md:text-[13px] text-[#111412] font-bold mb-1.5 line-clamp-1">{item.name}</h4>}
 
-          <div className="flex flex-col items-center justify-center mb-4 mt-auto w-full leading-tight">
-            {item.original_price && <span className="text-[12px] text-gray-400 line-through mb-0.5">৳ {formatPrice(item.original_price)}</span>}
-            <span className="text-[#B8860B] font-black text-xl">{formatPrice(item.price)} ৳</span>
+          <div className="flex flex-col items-center justify-center mb-3 mt-auto w-full leading-tight">
+            {item.original_price && <span className="text-[10px] md:text-[12px] text-gray-400 line-through mb-0.5">৳ {formatPrice(item.original_price)}</span>}
+            <span className="text-[#B8860B] font-black text-base md:text-xl">{formatPrice(item.price)} ৳</span>
           </div>
 
-          <div className="w-full flex flex-col gap-2">
+          <div className="w-full flex flex-col gap-1.5 md:gap-2">
             <button
               onClick={(e) => handleDirectOrder(item, 1, e)}
               disabled={isSoldOut}
-              className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[12px] font-bold py-2.5 rounded-sm flex items-center justify-center gap-1.5 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 disabled:bg-gray-300 disabled:border-gray-300 disabled:text-gray-500"
+              className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[11px] md:text-[12px] font-bold py-2 md:py-2.5 rounded-sm flex items-center justify-center gap-1 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 disabled:bg-gray-300 disabled:border-gray-300 disabled:text-gray-500"
             >
               ⚡ অর্ডার করুন
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); addToCart(item, 1); }}
               disabled={isSoldOut}
-              className="w-full bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[12px] font-bold py-2.5 rounded-sm flex items-center justify-center gap-1.5 hover:bg-[#EADFC8] transition-colors duration-300 disabled:bg-gray-100 disabled:text-gray-400"
+              className="w-full bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[11px] md:text-[12px] font-bold py-1.5 md:py-2.5 rounded-sm flex items-center justify-center gap-1 hover:bg-[#EADFC8] transition-colors duration-300 disabled:bg-gray-100 disabled:text-gray-400"
             >
               🛒 ব্যাগে যোগ
             </button>
@@ -1380,7 +1437,7 @@ export default function Home() {
   return (
     <>
       <main
-        className="min-h-screen text-[#111412] relative overflow-x-hidden scroll-smooth pb-16 md:pb-0"
+        className="min-h-screen text-[#111412] relative overflow-x-hidden scroll-smooth pb-20 md:pb-0"
         style={{
           fontFamily: storeSettings.font_family,
           backgroundColor: "#FAF5EB",
@@ -1402,6 +1459,10 @@ export default function Home() {
             0%, 100% { transform: translate(-50%, 0); } 
             50% { transform: translate(-50%, -10px); } 
           }
+          @keyframes floatPulse {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-4px); }
+          }
           @keyframes shimmer { 
             0% { background-position: -1000px 0; } 
             100% { background-position: 1000px 0; } 
@@ -1409,6 +1470,7 @@ export default function Home() {
           
           .animate-slide-up { animation: slideUp 0.5s ease-out forwards; } 
           .animate-bounce-short { animation: bounceShort 2s ease-in-out infinite; }
+          .animate-float-pulse { animation: floatPulse 2.5s ease-in-out infinite; }
           .skeleton-shimmer { 
             animation: shimmer 2.5s infinite linear; 
             background: linear-gradient(to right, #FAF5EB 4%, #F2E9D8 25%, #FAF5EB 36%); 
@@ -1422,13 +1484,12 @@ export default function Home() {
           .custom-html-content ul { list-style-type: disc; padding-left: 20px; margin-bottom: 8px; } 
           .custom-html-content li { margin-bottom: 4px; }
 
-          /* Custom Scrollbar for Category List */
           .category-scroll::-webkit-scrollbar {
              display: none;
           }
           .category-scroll {
-             -ms-overflow-style: none;  /* IE and Edge */
-             scrollbar-width: none;  /* Firefox */
+             -ms-overflow-style: none;
+             scrollbar-width: none;
           }
         `}} />
 
@@ -1439,62 +1500,77 @@ export default function Home() {
             backdropFilter: isBgVisible ? 'blur(4px)' : 'none'
           }}
         >
-          <div className="bg-[#111412] text-[#D4AF37] text-[11px] py-2.5 px-4 md:px-12 flex justify-center md:justify-between items-center border-b border-[#D4AF37]/30">
-            <div className="flex gap-4 items-center font-bold tracking-widest uppercase">
+          {/* Top Bar - Visible on both Mobile & Desktop with Order Tracking */}
+          <div className="bg-[#111412] text-[#D4AF37] text-[10px] md:text-[11px] py-2 px-3 md:px-12 flex justify-between items-center border-b border-[#D4AF37]/30">
+            <div className="flex gap-2 md:gap-4 items-center font-bold tracking-wider md:tracking-widest uppercase">
               <span>☎ হেল্পলাইন: {storeSettings.phone}</span>
               <span className="hidden md:inline px-4 border-l border-[#D4AF37]/30 text-[#EADFC8]">◀ এক্সক্লুসিভ অফার</span>
             </div>
-            <div className="hidden md:flex gap-4 font-bold tracking-widest uppercase">
-              <button onClick={() => { setShowTrackingModal(true); setTrackedOrders(null); setTrackingPhone(''); }} className="hover:text-white transition-colors">
-                ট্র্যাক অর্ডার
+            <div className="flex gap-2 md:gap-4 font-bold tracking-wider uppercase">
+              <button
+                onClick={() => openMyOrdersModal()}
+                className="bg-[#D4AF37]/20 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#111412] px-2.5 py-1 rounded-sm transition-colors flex items-center gap-1 text-[9px] md:text-[10px]"
+              >
+                📦 আমার অর্ডার / ট্র্যাক
               </button>
             </div>
           </div>
 
-          <header className="sticky top-0 z-40 bg-white border-b border-[#EADFC8] px-4 md:px-12 py-4 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center w-full md:w-auto justify-between md:justify-start gap-4 md:gap-6">
-              <button onClick={() => setIsSidebarOpen(true)} className="text-2xl text-[#111412] hover:text-[#D4AF37] transition-colors md:block hidden">
-                ☰
-              </button>
-              <div className="flex items-center gap-4 cursor-pointer" onClick={() => { setActiveCategory('All'); closeProductModal(); window.scrollTo(0, 0); }}>
-                <div className="relative flex items-center justify-center p-1.5">
-                  <div className="absolute inset-0 rounded-full border-l-[3px] border-b-[3px] border-[#D4AF37] shadow-[-3px_3px_8px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
-                  <div className="w-12 h-12 md:w-14 md:h-14 bg-[#111412] flex items-center justify-center font-bold text-2xl rounded-full overflow-hidden z-10 relative">
+          {/* Compact & Responsive Header */}
+          <header className="sticky top-0 z-40 bg-white border-b border-[#EADFC8] px-3 md:px-12 py-2.5 md:py-4 shadow-sm flex flex-col md:flex-row justify-between items-center gap-2.5 md:gap-4">
+            <div className="flex items-center w-full md:w-auto justify-between md:justify-start gap-3 md:gap-6">
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setActiveCategory('All'); closeProductModal(); window.scrollTo(0, 0); }}>
+                <div className="relative flex items-center justify-center p-1">
+                  <div className="absolute inset-0 rounded-full border-l-[2px] md:border-l-[3px] border-b-[2px] md:border-b-[3px] border-[#D4AF37] shadow-[-2px_2px_6px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
+                  <div className="w-10 h-10 md:w-14 md:h-14 bg-[#111412] flex items-center justify-center font-bold text-xl md:text-2xl rounded-full overflow-hidden z-10 relative">
                     {storeSettings.logo_url ? (
-                      <img src={storeSettings.logo_url} loading="lazy" className="w-full h-full object-cover" />
+                      <img src={storeSettings.logo_url} loading="lazy" alt="Logo" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-[#D4AF37] font-serif italic text-3xl">🌙</span>
+                      <span className="text-[#D4AF37] font-serif italic text-2xl md:text-3xl">🌙</span>
                     )}
                   </div>
                 </div>
                 <div className="flex flex-col justify-center">
-                  <h1 className="text-2xl md:text-3xl font-serif italic font-black leading-none tracking-[0.1em] drop-shadow-[0_2px_4px_rgba(212,175,55,0.3)]" style={{ color: storeSettings.brand_name_color, textShadow: "2px 2px 4px rgba(0,0,0,0.5), 0 0 10px rgba(212,175,55,0.4)" }}>
+                  <h1 className="text-xl md:text-3xl font-serif italic font-black leading-none tracking-[0.08em] drop-shadow-[0_2px_4px_rgba(212,175,55,0.3)]" style={{ color: storeSettings.brand_name_color, textShadow: "1px 1px 3px rgba(0,0,0,0.4)" }}>
                     {storeSettings.shop_name}
                   </h1>
-                  <span className="text-[9px] md:text-[10px] text-[#111412] uppercase tracking-[0.4em] mt-1.5 font-bold">Premium Edition</span>
+                  <span className="text-[8px] md:text-[10px] text-[#111412] uppercase tracking-[0.3em] mt-1 font-bold">Premium Edition</span>
                 </div>
+              </div>
+
+              {/* Mobile Quick Icons in Header */}
+              <div className="flex md:hidden items-center gap-3">
+                <button onClick={() => setIsWishlistOpen(true)} className="relative text-lg text-[#111412] p-1">
+                  ❤️{wishlist.length > 0 && <span className="absolute -top-1 -right-1 bg-[#D4AF37] text-white text-[8px] font-bold px-1 rounded-full">{wishlist.length}</span>}
+                </button>
+                <button onClick={() => openMyOrdersModal()} className="text-xs bg-[#FAF5EB] border border-[#D4AF37] text-[#111412] font-bold px-2.5 py-1.5 rounded-sm shadow-sm">
+                  📦 অর্ডার দেখুন
+                </button>
               </div>
             </div>
 
             <div className="w-full md:w-1/2 flex border border-[#EADFC8] rounded-md overflow-hidden bg-[#FAF5EB] shadow-inner focus-within:border-[#D4AF37] transition-colors">
-              <input type="text" placeholder="পণ্য বা প্রোডাক্ট আইডি খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full py-3 pl-5 pr-10 text-sm text-[#111412] outline-none bg-transparent font-medium" />
-              <button className="bg-[#111412] text-[#D4AF37] px-8 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold tracking-widest">
+              <input type="text" placeholder="পণ্য বা প্রোডাক্ট আইডি খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full py-2 md:py-3 pl-4 pr-4 text-xs md:text-sm text-[#111412] outline-none bg-transparent font-medium" />
+              <button className="bg-[#111412] text-[#D4AF37] px-5 md:px-8 text-xs md:text-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors font-bold tracking-widest">
                 খুঁজুন
               </button>
             </div>
 
-            <div className="hidden md:flex items-center gap-7">
-              <button onClick={() => { if (user) setShowProfileModal(true); else setShowAuthModal(true); }} className="text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">👤</button>
-              <button onClick={() => setIsWishlistOpen(true)} className="relative text-xl text-[#111412] hover:text-[#D4AF37] transition-colors">
+            <div className="hidden md:flex items-center gap-6">
+              <button onClick={() => openMyOrdersModal()} className="text-xs bg-[#FAF5EB] border border-[#D4AF37] text-[#111412] hover:bg-[#D4AF37] font-bold px-3.5 py-2 rounded-sm transition-colors flex items-center gap-1.5 shadow-sm">
+                📦 আমার অর্ডার
+              </button>
+              <button onClick={() => { if (user) setShowProfileModal(true); else setShowAuthModal(true); }} className="text-xl text-[#111412] hover:text-[#D4AF37] transition-colors" title="Account">👤</button>
+              <button onClick={() => setIsWishlistOpen(true)} className="relative text-xl text-[#111412] hover:text-[#D4AF37] transition-colors" title="Wishlist">
                 ❤️{wishlist.length > 0 && <span className="absolute -top-2 -right-3 bg-[#D4AF37] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{wishlist.length}</span>}
               </button>
-              <button onClick={() => setIsCartOpen(true)} className={`relative text-2xl text-[#111412] hover:text-[#D4AF37] transition-all duration-300 ${animateCart ? 'scale-125 text-[#B8860B]' : ''}`}>
+              <button onClick={() => setIsCartOpen(true)} className={`relative text-2xl text-[#111412] hover:text-[#D4AF37] transition-all duration-300 ${animateCart ? 'scale-125 text-[#B8860B]' : ''}`} title="Shopping Bag">
                 🛒{cart.length > 0 && <span className="absolute -top-1 -right-3 bg-[#111412] text-[#D4AF37] text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-[#D4AF37]">{totalItemsCount}</span>}
               </button>
             </div>
           </header>
 
-          <div className="hidden md:flex justify-center items-center gap-8 py-3.5 bg-white border-b border-[#EADFC8] text-[11px] font-bold text-[#111412] uppercase tracking-[0.15em]">
+          <div className="hidden md:flex justify-center items-center gap-8 py-3 bg-white border-b border-[#EADFC8] text-[11px] font-bold text-[#111412] uppercase tracking-[0.15em]">
             <span className={`cursor-pointer transition-colors ${activeCategory === 'All' ? 'text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`} onClick={() => { setActiveCategory('All'); closeProductModal(); window.scrollTo(0, 0); }}>
               সকল ক্যাটাগরি
             </span>
@@ -1505,25 +1581,30 @@ export default function Home() {
             ))}
           </div>
 
-          <section className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8 flex flex-col gap-8">
+          <section className="max-w-[1400px] mx-auto px-3 md:px-8 mt-4 md:mt-8 flex flex-col gap-5 md:gap-8">
 
-            {/* Banner Section Without Timer */}
+            {/* Main Slider Banner - Responsive without Distortion */}
             {activeCategory === 'All' && !searchQuery && activeBanners.length > 0 && (
-              <div className="w-full shadow-lg rounded-md relative overflow-hidden bg-[#FAF5EB] border border-[#EADFC8]" style={{ height: 'clamp(200px, 35vw, 450px)' }}>
+              <div className="w-full shadow-lg rounded-md relative overflow-hidden bg-[#111412] border border-[#EADFC8] aspect-[16/8] sm:aspect-[16/7] md:aspect-[16/6] max-h-[440px]">
                 {activeBanners.map((banner, idx) => (
                   <div
                     key={idx}
                     className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === currentBannerIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-                    style={{ backgroundImage: `url('${banner.imageUrl}')`, backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
+                  >
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.title || "Zeenat Mart Banner"}
+                      className="w-full h-full object-cover object-center"
+                    />
                   </div>
                 ))}
                 {activeBanners.length > 1 && (
-                  <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 flex gap-2.5 z-20 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
+                  <div className="absolute bottom-3 md:bottom-5 left-1/2 transform -translate-x-1/2 flex gap-2 z-20 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm">
                     {activeBanners.map((_, idx) => (
                       <div
                         key={idx}
                         onClick={() => setCurrentBannerIndex(idx)}
-                        className={`w-2 h-2 rounded-full cursor-pointer transition-all duration-300 shadow-sm ${idx === currentBannerIndex ? 'bg-[#D4AF37] w-5' : 'bg-white hover:bg-[#EADFC8]'}`}>
+                        className={`h-2 rounded-full cursor-pointer transition-all duration-300 shadow-sm ${idx === currentBannerIndex ? 'bg-[#D4AF37] w-5' : 'bg-white w-2 hover:bg-[#EADFC8]'}`}>
                       </div>
                     ))}
                   </div>
@@ -1531,12 +1612,12 @@ export default function Home() {
               </div>
             )}
 
-            {/* Premium Horizontal Scrollable Category Bar under Banner */}
-            <div className="w-full bg-white p-3 rounded-md shadow-sm border border-[#EADFC8] overflow-hidden flex items-center relative">
-              <div className="flex gap-3 overflow-x-auto category-scroll scroll-smooth w-full px-1 py-1">
+            {/* Horizontal Scrollable Category Bar */}
+            <div className="w-full bg-white p-2 md:p-3 rounded-md shadow-sm border border-[#EADFC8] overflow-hidden flex items-center relative">
+              <div className="flex gap-2 md:gap-3 overflow-x-auto category-scroll scroll-smooth w-full px-1 py-0.5">
                 <button
                   onClick={() => { setActiveCategory('All'); closeProductModal(); window.scrollTo(0, 0); }}
-                  className={`px-6 py-2.5 text-[12px] font-bold rounded-full transition-all whitespace-nowrap shadow-sm border-2 ${activeCategory === 'All' ? 'bg-[#111412] border-[#D4AF37] text-[#D4AF37]' : 'bg-[#FAF5EB] border-[#EADFC8] text-[#111412] hover:border-[#D4AF37]'}`}
+                  className={`px-4 md:px-6 py-2 md:py-2.5 text-[11px] md:text-[12px] font-bold rounded-full transition-all whitespace-nowrap shadow-sm border-2 ${activeCategory === 'All' ? 'bg-[#111412] border-[#D4AF37] text-[#D4AF37]' : 'bg-[#FAF5EB] border-[#EADFC8] text-[#111412] hover:border-[#D4AF37]'}`}
                 >
                   সকল প্রোডাক্ট
                 </button>
@@ -1544,7 +1625,7 @@ export default function Home() {
                   <button
                     key={idx}
                     onClick={() => { setActiveCategory(cat); closeProductModal(); window.scrollTo(0, 0); }}
-                    className={`px-6 py-2.5 text-[12px] font-bold rounded-full transition-all whitespace-nowrap shadow-sm border-2 ${activeCategory === cat ? 'bg-[#111412] border-[#D4AF37] text-[#D4AF37]' : 'bg-[#FAF5EB] border-[#EADFC8] text-[#111412] hover:border-[#D4AF37]'}`}
+                    className={`px-4 md:px-6 py-2 md:py-2.5 text-[11px] md:text-[12px] font-bold rounded-full transition-all whitespace-nowrap shadow-sm border-2 ${activeCategory === cat ? 'bg-[#111412] border-[#D4AF37] text-[#D4AF37]' : 'bg-[#FAF5EB] border-[#EADFC8] text-[#111412] hover:border-[#D4AF37]'}`}
                   >
                     {cat}
                   </button>
@@ -1552,16 +1633,16 @@ export default function Home() {
               </div>
             </div>
 
-            <div id="products-section" className="w-full mt-2 flex flex-col gap-20">
+            <div id="products-section" className="w-full mt-1 flex flex-col gap-12 md:gap-20">
               {loading ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-6 mt-4">
                   {[...Array(12)].map((_, i) => (
-                    <div key={i} className="bg-white border border-[#EADFC8] rounded-md h-[380px] flex flex-col p-4 shadow-sm overflow-hidden">
-                      <div className="skeleton-shimmer h-48 w-full rounded-sm mb-4"></div>
+                    <div key={i} className="bg-white border border-[#EADFC8] rounded-md h-[320px] md:h-[380px] flex flex-col p-3 md:p-4 shadow-sm overflow-hidden">
+                      <div className="skeleton-shimmer h-40 md:h-48 w-full rounded-sm mb-3"></div>
                       <div className="skeleton-shimmer h-3 w-1/3 mx-auto mb-2 rounded-sm"></div>
-                      <div className="skeleton-shimmer h-4 w-3/4 mx-auto mb-4 rounded-sm"></div>
-                      <div className="skeleton-shimmer h-6 w-1/2 mx-auto mt-auto mb-4 rounded-sm"></div>
-                      <div className="skeleton-shimmer h-8 w-full rounded-sm mb-2"></div>
+                      <div className="skeleton-shimmer h-4 w-3/4 mx-auto mb-3 rounded-sm"></div>
+                      <div className="skeleton-shimmer h-6 w-1/2 mx-auto mt-auto mb-3 rounded-sm"></div>
+                      <div className="skeleton-shimmer h-8 w-full rounded-sm mb-1.5"></div>
                       <div className="skeleton-shimmer h-8 w-full rounded-sm"></div>
                     </div>
                   ))}
@@ -1592,27 +1673,33 @@ export default function Home() {
 
                   return (
                     <div key={catTitle} className="w-full">
-                      <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#D4AF37]/50 pb-4 mb-8">
-                        <h2 className="font-bold tracking-wide" style={{ fontSize: section?.fontSize ? `${section.fontSize}px` : '30px', color: section?.color || storeSettings.heading_color || '#B8860B' }}>{catTitle}</h2>
-                        <button onClick={() => { setActiveCategory(catTitle); closeProductModal(); window.scrollTo(0, 0); }} className="bg-[#111412] text-[#D4AF37] text-[10px] px-6 py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md mt-4 md:mt-0">সবগুলো দেখুন →</button>
+                      <div className="flex flex-row justify-between items-center border-b-2 border-[#D4AF37]/50 pb-3 mb-5 md:mb-8">
+                        <h2 className="font-bold tracking-wide text-xl md:text-3xl" style={{ color: section?.color || storeSettings.heading_color || '#B8860B' }}>{catTitle}</h2>
+                        <button onClick={() => { setActiveCategory(catTitle); closeProductModal(); window.scrollTo(0, 0); }} className="bg-[#111412] text-[#D4AF37] text-[9px] md:text-[10px] px-3.5 md:px-6 py-2 md:py-2.5 font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.15em] uppercase shadow-md shrink-0">সবগুলো দেখুন →</button>
                       </div>
 
                       {subCats.length > 0 && (
-                        <div className="flex gap-3 overflow-x-auto category-scroll mb-8 pb-2">
-                          <button onClick={() => handleSubCategoryClick(catTitle, 'All')} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === 'All' ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>সব</button>
+                        <div className="flex gap-2.5 overflow-x-auto category-scroll mb-6 pb-1">
+                          <button onClick={() => handleSubCategoryClick(catTitle, 'All')} className={`px-4 py-1.5 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === 'All' ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>সব</button>
                           {subCats.map(sub => (
-                            <button key={sub} onClick={() => handleSubCategoryClick(catTitle, sub)} className={`px-5 py-2 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === sub ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>{sub}</button>
+                            <button key={sub} onClick={() => handleSubCategoryClick(catTitle, sub)} className={`px-4 py-1.5 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap shadow-sm border ${currentSub === sub ? 'bg-[#D4AF37] border-[#D4AF37] text-[#111412]' : 'bg-white border-[#EADFC8] text-gray-600 hover:border-[#D4AF37]'}`}>{sub}</button>
                           ))}
                         </div>
                       )}
 
+                      {/* Responsive Category Banner Fix - Perfect on both Mobile & PC */}
                       {section && section.imageUrl && activeCategory === 'All' && (
-                        <div className="w-full mb-10 shadow-md rounded-sm overflow-hidden border border-[#EADFC8] relative bg-[#FAF5EB]" style={{ height: section.imageHeight ? `${section.imageHeight}px` : '300px' }}>
-                          <img src={section.imageUrl} loading="lazy" alt={section.title} className="w-full h-full absolute inset-0" style={{ objectFit: 'fill', width: '100%', height: '100%' }} />
+                        <div className="w-full mb-6 md:mb-10 shadow-md rounded-md overflow-hidden border border-[#EADFC8] relative bg-[#111412]">
+                          <img
+                            src={section.imageUrl}
+                            loading="lazy"
+                            alt={section.title}
+                            className="w-full h-auto max-h-[220px] sm:max-h-[300px] md:max-h-[380px] object-cover object-center block mx-auto"
+                          />
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 mt-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-6 mt-3">
                         {finalProducts.length > 0 ? finalProducts.map(item => renderProductCard(item)) : <p className="col-span-full text-center text-sm text-gray-400 py-10 font-bold uppercase tracking-widest">No products found in this sub-category</p>}
                       </div>
                     </div>
@@ -1622,68 +1709,107 @@ export default function Home() {
             </div>
           </section>
 
-          <footer className="border-t-4 border-[#D4AF37] bg-[#111412] mt-24 pb-12 pt-20 shadow-inner relative z-10">
-            <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-3 gap-12 text-sm text-[#EADFC8]">
+          <footer className="border-t-4 border-[#D4AF37] bg-[#111412] mt-20 pb-12 pt-16 shadow-inner relative z-10">
+            <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-3 gap-10 text-sm text-[#EADFC8]">
               <div>
-                <h4 className="font-serif italic font-bold text-3xl mb-6 uppercase tracking-[0.15em] drop-shadow-[0_2px_4px_rgba(212,175,55,0.3)]" style={{ color: storeSettings.brand_name_color || '#D4AF37' }}>{storeSettings.shop_name}</h4>
-                <p className="leading-relaxed mb-4 font-medium max-w-sm">বাংলাদেশের অন্যতম সেরা প্রিমিয়াম ইসলামিক লাইফস্টাইল এবং ফ্যাশন অনলাইন শপ। আমরা বিশ্বাস করি মডেস্টি এবং আভিজাত্য একে অপরের পরিপূরক।</p>
+                <h4 className="font-serif italic font-bold text-2xl md:text-3xl mb-4 uppercase tracking-[0.15em] drop-shadow-[0_2px_4px_rgba(212,175,55,0.3)]" style={{ color: storeSettings.brand_name_color || '#D4AF37' }}>{storeSettings.shop_name}</h4>
+                <p className="leading-relaxed mb-4 font-medium max-w-sm text-xs md:text-sm">বাংলাদেশের অন্যতম সেরা প্রিমিয়াম ইসলামিক লাইফস্টাইল এবং ফ্যাশন অনলাইন শপ। আমরা বিশ্বাস করি মডেস্টি এবং আভিজাত্য একে অপরের পরিপূরক।</p>
               </div>
               <div>
-                <h4 className="font-bold text-[#D4AF37] mb-6 uppercase text-xs tracking-[0.2em] border-b border-[#D4AF37]/30 pb-3 inline-block">Contact Us</h4>
-                <p className="mb-4 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({ title: 'যোগাযোগ', content: storeSettings.contact_info })}>📍 যোগাযোগ তথ্য</p>
-                <p className="mb-4 text-[#EADFC8]">📞 ফোন: <span className="text-[#D4AF37] font-bold">{storeSettings.phone}</span></p>
+                <h4 className="font-bold text-[#D4AF37] mb-4 uppercase text-xs tracking-[0.2em] border-b border-[#D4AF37]/30 pb-2 inline-block">Contact Us</h4>
+                <p className="mb-3 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({ title: 'যোগাযোগ', content: storeSettings.contact_info })}>📍 যোগাযোগ তথ্য</p>
+                <p className="mb-3 text-[#EADFC8]">📞 ফোন: <span className="text-[#D4AF37] font-bold">{storeSettings.phone}</span></p>
               </div>
               <div>
-                <h4 className="font-bold text-[#D4AF37] mb-6 uppercase text-xs tracking-[0.2em] border-b border-[#D4AF37]/30 pb-3 inline-block">Policies</h4>
-                <p className="mb-4 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({ title: 'রিটার্ন পলিসি', content: storeSettings.return_policy })}>🛡 রিটার্ন পলিসি</p>
-                <p className="mb-4 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({ title: 'ডেলিভারি পলিসি', content: storeSettings.delivery_policy })}>🚚 ডেলিভারি পলিসি</p>
+                <h4 className="font-bold text-[#D4AF37] mb-4 uppercase text-xs tracking-[0.2em] border-b border-[#D4AF37]/30 pb-2 inline-block">Policies & Orders</h4>
+                <p className="mb-3 hover:text-white transition cursor-pointer font-medium text-[#D4AF37]" onClick={() => openMyOrdersModal()}>📦 আমার অর্ডার ও ট্র্যাকিং</p>
+                <p className="mb-3 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({ title: 'রিটার্ন পলিসি', content: storeSettings.return_policy })}>🛡 রিটার্ন পলিসি</p>
+                <p className="mb-3 hover:text-white transition cursor-pointer font-medium" onClick={() => setInfoModal({ title: 'ডেলিভারি পলিসি', content: storeSettings.delivery_policy })}>🚚 ডেলিভারি পলিসি</p>
               </div>
             </div>
           </footer>
 
         </div>
 
-        {storeSettings.fb_page_url && (
-          <a href={storeSettings.fb_page_url} target="_blank" rel="noopener noreferrer" className="fixed bottom-24 md:bottom-20 right-6 z-[250] bg-[#1877F2] text-white p-3.5 rounded-full shadow-2xl hover:bg-[#166FE5] transition-transform hover:scale-110 border-2 border-white hidden md:flex">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-              <path d="M12 0C5.373 0 0 5.068 0 11.321c0 3.565 1.763 6.744 4.538 8.87v3.809l4.168-2.292c1.05.292 2.158.448 3.294.448 6.627 0 12-5.068 12-11.321S18.627 0 12 0zm1.206 15.352l-3.08-3.295-6.002 3.295 6.623-7.039 3.167 3.295 5.915-3.295-6.623 7.039z" />
-            </svg>
-          </a>
-        )}
+        {/* ========================================================================= */}
+        {/* FIXED FLOATING WHATSAPP & MESSENGER WIDGET (VISIBLE ON BOTH MOBILE & PC) */}
+        {/* ========================================================================= */}
+        <div className="fixed bottom-20 md:bottom-8 right-3 md:right-6 z-[300] flex flex-col items-end gap-2 pointer-events-none">
+          {/* Bangla Help Callout Badge */}
+          <div className="bg-[#111412]/95 text-[#D4AF37] border border-[#D4AF37] px-3 py-1.5 rounded-full shadow-[0_4px_15px_rgba(0,0,0,0.4)] text-[10px] md:text-xs font-bold tracking-wide flex items-center gap-1.5 animate-float-pulse pointer-events-auto backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-[#25D366] animate-ping"></span>
+            <span>যেকোনো সাহায্যের জন্য ইনবক্স করুন</span>
+          </div>
 
-        {/* Mobile Bottom Navigation Bar */}
-        <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-[#EADFC8] flex justify-between items-center z-[250] shadow-[0_-5px_15px_rgba(212,175,55,0.15)] text-[#111412] h-16">
+          {/* Buttons Row / Stack */}
+          <div className="flex items-center gap-2.5 pointer-events-auto">
+            {/* WhatsApp Floating Button */}
+            <a
+              href={`https://wa.me/${formattedWaPhone}?text=${encodeURIComponent(`আসসালামু আলাইকুম ${storeSettings.shop_name}, আমার কিছু তথ্য জানার ছিল।`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Chat on WhatsApp"
+              className="bg-[#25D366] text-white w-12 h-12 md:w-14 md:h-14 rounded-full shadow-[0_6px_20px_rgba(37,211,102,0.5)] flex items-center justify-center hover:scale-110 transition-transform duration-300 border-2 border-white"
+            >
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+                <path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z" />
+              </svg>
+            </a>
+
+            {/* Messenger Floating Button */}
+            {storeSettings.fb_page_url && (
+              <a
+                href={storeSettings.fb_page_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Chat on Messenger"
+                className="bg-[#1877F2] text-white w-12 h-12 md:w-14 md:h-14 rounded-full shadow-[0_6px_20px_rgba(24,119,242,0.5)] flex items-center justify-center hover:scale-110 transition-transform duration-300 border-2 border-white"
+              >
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+                  <path d="M12 0C5.373 0 0 5.068 0 11.321c0 3.565 1.763 6.744 4.538 8.87v3.809l4.168-2.292c1.05.292 2.158.448 3.294.448 6.627 0 12-5.068 12-11.321S18.627 0 12 0zm1.206 15.352l-3.08-3.295-6.002 3.295 6.623-7.039 3.167 3.295 5.915-3.295-6.623 7.039z" />
+                </svg>
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Bottom Navigation Bar (5 Tabs including "আমার অর্ডার") */}
+        <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-[#EADFC8] flex justify-between items-center z-[250] shadow-[0_-5px_15px_rgba(212,175,55,0.15)] text-[#111412] h-16 px-1">
           <button onClick={() => { setActiveCategory('All'); closeProductModal(); window.scrollTo(0, 0); }} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors">
-            <span className="text-xl leading-none">🏠</span>
-            <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Home</span>
+            <span className="text-lg leading-none">🏠</span>
+            <span className="text-[9px] font-bold mt-1">হোম</span>
           </button>
           <button onClick={() => setIsSidebarOpen(true)} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors">
-            <span className="text-xl leading-none">☰</span>
-            <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Menu</span>
+            <span className="text-lg leading-none">☰</span>
+            <span className="text-[9px] font-bold mt-1">মেনু</span>
           </button>
           <button onClick={() => setIsCartOpen(true)} className={`flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors relative ${animateCart ? 'scale-110 text-[#B8860B]' : ''}`}>
-            <span className="text-xl leading-none">🛒</span>
-            {cart.length > 0 && <span className="absolute top-2 right-4 bg-[#D4AF37] text-[#111412] border border-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">{totalItemsCount}</span>}
-            <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Bag</span>
+            <span className="text-lg leading-none">🛒</span>
+            {cart.length > 0 && <span className="absolute top-1.5 right-3 bg-[#D4AF37] text-[#111412] border border-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">{totalItemsCount}</span>}
+            <span className="text-[9px] font-bold mt-1">ব্যাগ</span>
+          </button>
+          <button onClick={() => openMyOrdersModal()} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors">
+            <span className="text-lg leading-none">📦</span>
+            <span className="text-[9px] font-bold mt-1 text-[#B8860B]">আমার অর্ডার</span>
           </button>
           <button onClick={() => user ? setShowProfileModal(true) : setShowAuthModal(true)} className="flex-1 flex flex-col items-center justify-center h-full hover:text-[#B8860B] transition-colors">
-            <span className="text-xl leading-none">👤</span>
-            <span className="text-[9px] font-black mt-1 uppercase tracking-widest">Account</span>
+            <span className="text-lg leading-none">👤</span>
+            <span className="text-[9px] font-bold mt-1">অ্যাকাউন্ট</span>
           </button>
         </div>
 
         {isAdmin && (
-          <div className="fixed bottom-16 md:bottom-0 left-0 w-full bg-[#111412] text-[#D4AF37] border-t border-[#D4AF37]/30 z-[250] flex justify-between items-center px-6 py-3 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+          <div className="fixed bottom-16 md:bottom-0 left-0 w-full bg-[#111412] text-[#D4AF37] border-t border-[#D4AF37]/30 z-[250] flex justify-between items-center px-4 md:px-6 py-2.5 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
             <div className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span> {isMasterAdmin ? 'Master Admin' : 'Staff Panel'}
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2.5">
               {isMasterAdmin && (
-                <button onClick={openAddModal} className="bg-[#D4AF37] text-[#111412] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.2em] uppercase">
+                <button onClick={openAddModal} className="bg-[#D4AF37] text-[#111412] px-4 py-1.5 rounded-sm text-[10px] font-bold hover:bg-[#C5A059] transition-colors shadow-sm tracking-[0.15em] uppercase">
                   + Add
                 </button>
               )}
-              <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-5 py-2 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.2em] uppercase">
+              <button onClick={() => setShowAdminDashboard(true)} className="bg-transparent border border-[#D4AF37] text-[#D4AF37] px-4 py-1.5 rounded-sm text-[10px] font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-sm tracking-[0.15em] uppercase">
                 ⚙ Panel
               </button>
             </div>
@@ -1691,7 +1817,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* Sidebar Modal Section (FIXED z-index) */}
+      {/* Sidebar Modal Section */}
       {isSidebarOpen && (
         <div style={{ position: 'relative', zIndex: 999999 }}>
           <div className="fixed inset-0 bg-[#111412]/60 backdrop-blur-sm transition-opacity z-[999998]" onClick={() => setIsSidebarOpen(false)}></div>
@@ -1701,7 +1827,7 @@ export default function Home() {
                 <div className="relative flex items-center justify-center p-1">
                   <div className="absolute inset-0 rounded-full border-l-[2px] border-b-[2px] border-[#D4AF37] shadow-[-2px_2px_5px_rgba(212,175,55,0.4)] rotate-[-45deg]"></div>
                   <div className="w-8 h-8 bg-[#111412] flex items-center justify-center font-bold text-lg rounded-full overflow-hidden relative">
-                    {storeSettings.logo_url ? <img src={storeSettings.logo_url} className="w-full h-full object-cover" /> : <span className="text-[#D4AF37]">🌙</span>}
+                    {storeSettings.logo_url ? <img src={storeSettings.logo_url} alt="Logo" className="w-full h-full object-cover" /> : <span className="text-[#D4AF37]">🌙</span>}
                   </div>
                 </div>
                 <span className="font-bold text-xs uppercase tracking-[0.2em] italic" style={{ color: storeSettings.brand_name_color || '#D4AF37' }}>{storeSettings.shop_name}</span>
@@ -1711,8 +1837,9 @@ export default function Home() {
 
             <div className="flex-1 overflow-y-auto custom-scrollbar py-6 text-[12px] font-bold text-[#111412] uppercase tracking-widest">
               <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setActiveCategory('All'); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0, 0); }}><span>✦</span> হোম</div>
+              <div className="px-6 py-3.5 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#B8860B]" onClick={() => { setIsSidebarOpen(false); openMyOrdersModal(); }}><span>📦</span> আমার অর্ডার দেখুন</div>
 
-              <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
+              <div className="my-4 border-t border-[#D4AF37]/20 mx-4"></div>
               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black flex items-center gap-2 mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>ক্যাটাগরি সমূহ</div>
               {dynamicSidebarCategories.map((cat, i) => (
                 <div key={i} className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4 text-[#111412]" onClick={() => { setActiveCategory(cat); closeProductModal(); setIsSidebarOpen(false); window.scrollTo(0, 0); }}>
@@ -1720,7 +1847,7 @@ export default function Home() {
                 </div>
               ))}
 
-              <div className="my-5 border-t border-[#D4AF37]/20 mx-4"></div>
+              <div className="my-4 border-t border-[#D4AF37]/20 mx-4"></div>
               <div className="px-6 py-2 text-[10px] tracking-[0.2em] font-black mb-2" style={{ color: storeSettings.heading_color || '#B8860B' }}>প্রয়োজনীয় লিংক</div>
               <div className="px-6 py-3 hover:bg-[#EADFC8] transition-colors cursor-pointer flex items-center gap-4" onClick={() => { setInfoModal({ title: 'যোগাযোগ', content: storeSettings.contact_info }); setIsSidebarOpen(false); }}>
                 <span>✉</span> যোগাযোগ
@@ -1729,7 +1856,7 @@ export default function Home() {
                 <span>🛡</span> রিটার্ন পলিসি
               </div>
 
-              <div className="mt-10 mx-5 px-4 py-4 bg-[#111412] text-[#D4AF37] text-center rounded-sm shadow-md font-bold tracking-[0.2em] cursor-pointer border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300">
+              <div className="mt-8 mx-5 px-4 py-4 bg-[#111412] text-[#D4AF37] text-center rounded-sm shadow-md font-bold tracking-[0.2em] cursor-pointer border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300">
                 📞 {storeSettings.phone}
               </div>
             </div>
@@ -1746,35 +1873,83 @@ export default function Home() {
         )}
 
         {fomoMsg && (
-          <div className="fixed bottom-24 md:bottom-8 left-4 md:left-8 bg-white border border-[#D4AF37] p-3 rounded-md shadow-[0_5px_20px_rgba(212,175,55,0.4)] z-[9998] flex items-center gap-4 animate-slide-up max-w-[280px]">
-            <div className="w-12 h-12 rounded overflow-hidden border border-[#EADFC8] shrink-0 bg-[#FAF5EB]">
-              <img src={fomoMsg.image_url || ''} loading="lazy" className="w-full h-full object-cover" />
+          <div className="fixed bottom-20 md:bottom-8 left-3 md:left-8 bg-white border border-[#D4AF37] p-2.5 rounded-md shadow-[0_5px_20px_rgba(212,175,55,0.4)] z-[240] flex items-center gap-3 animate-slide-up max-w-[230px] md:max-w-[280px]">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded overflow-hidden border border-[#EADFC8] shrink-0 bg-[#FAF5EB]">
+              <img src={fomoMsg.image_url || ''} loading="lazy" alt="" className="w-full h-full object-cover" />
             </div>
             <div className="flex-1">
-              <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Eimatro Order Hoyeche!
+              <p className="text-[8px] md:text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-0.5 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> এইমাত্র অর্ডার হয়েছে!
               </p>
-              <p className="text-[11px] font-bold text-[#111412] line-clamp-1">{fomoMsg.name}</p>
-              <p className="text-[9px] text-[#B8860B] font-black mt-0.5 tracking-widest">From: Dhaka</p>
+              <p className="text-[10px] md:text-[11px] font-bold text-[#111412] line-clamp-1">{fomoMsg.name}</p>
+              <p className="text-[8px] md:text-[9px] text-[#B8860B] font-black mt-0.5 tracking-widest">From: Dhaka</p>
             </div>
           </div>
         )}
 
+        {/* ========================================================================= */}
+        {/* UPDATED ORDER SUCCESS MODAL WITH ORDERED PRODUCTS SUMMARY                 */}
+        {/* ========================================================================= */}
         {orderSuccess.show && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[2000] p-4">
-            <div className="bg-white p-10 rounded-sm text-center max-w-sm w-full relative overflow-hidden shadow-2xl border border-[#D4AF37]">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[2000] p-4 overflow-y-auto">
+            <div className="bg-white p-6 md:p-8 rounded-sm text-center max-w-md w-full relative overflow-hidden shadow-2xl border-2 border-[#D4AF37] my-auto">
               <div className="absolute top-0 left-0 w-full h-2 bg-[#D4AF37] animate-pulse"></div>
-              <div className="w-24 h-24 bg-[#FAF5EB] rounded-full border-4 border-[#D4AF37] flex items-center justify-center mx-auto mb-6 shadow-inner relative">
-                <span className="text-5xl animate-bounce">🎉</span>
+              <div className="w-20 h-20 bg-[#FAF5EB] rounded-full border-4 border-[#D4AF37] flex items-center justify-center mx-auto mb-4 shadow-inner relative">
+                <span className="text-4xl animate-bounce">🎉</span>
               </div>
-              <h2 className="text-3xl font-black text-[#111412] mb-3 uppercase tracking-widest drop-shadow-sm">Alhamdulillah!</h2>
-              <p className="text-gray-600 mb-2 font-bold text-sm tracking-wide">আপনার অর্ডারটি সফলভাবে রিসিভ হয়েছে।</p>
-              <p className="text-[11px] font-black text-[#B8860B] mb-8 tracking-[0.2em] uppercase bg-[#FAF5EB] p-2 rounded-sm border border-[#EADFC8]">
+              <h2 className="text-2xl font-black text-[#111412] mb-1 uppercase tracking-widest">Alhamdulillah!</h2>
+              <p className="text-gray-600 mb-3 font-bold text-xs md:text-sm">আপনার অর্ডারটি সফলভাবে সম্পন্ন হয়েছে।</p>
+              <p className="text-[11px] font-black text-[#B8860B] mb-4 tracking-[0.2em] uppercase bg-[#FAF5EB] p-2 rounded-sm border border-[#EADFC8]">
                 Order ID: #{orderSuccess.orderId}
               </p>
-              <button onClick={() => setOrderSuccess({ show: false, orderId: '' })} className="w-full bg-[#111412] text-[#D4AF37] font-bold py-4 rounded-sm uppercase tracking-widest text-xs hover:bg-[#D4AF37] hover:text-[#111412] transition-colors border border-[#D4AF37] shadow-md">
-                ওকে, ধন্যবাদ
-              </button>
+
+              {/* Ordered Items Preview Box inside Success Modal */}
+              {orderSuccess.items && orderSuccess.items.length > 0 && (
+                <div className="text-left bg-[#FAF5EB] border border-[#EADFC8] rounded-sm p-3.5 mb-5 max-h-48 overflow-y-auto custom-scrollbar">
+                  <p className="text-[10px] font-black text-[#B8860B] uppercase tracking-wider mb-2.5 border-b border-[#EADFC8] pb-1.5">
+                    🛍️ আপনার অর্ডারকৃত পণ্যসমূহ:
+                  </p>
+                  <div className="space-y-2.5">
+                    {orderSuccess.items.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white p-2 rounded-sm border border-[#EADFC8] text-xs">
+                        <div className="flex items-center gap-2.5">
+                          {item.image_url && (
+                            <img src={item.image_url} alt={item.name} className="w-10 h-10 object-cover rounded-sm border border-[#EADFC8] shrink-0" />
+                          )}
+                          <div>
+                            <p className="font-bold text-[#111412] line-clamp-1">{item.name}</p>
+                            <p className="text-[10px] text-gray-500 font-bold">পরিমাণ: {item.quantity} টি</p>
+                          </div>
+                        </div>
+                        <span className="font-black text-[#B8860B] ml-2">৳{getNumericPrice(item.price) * item.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between items-center border-t border-[#EADFC8] mt-3 pt-2 text-xs font-black text-[#111412]">
+                    <span>সর্বমোট বিল (ডেলিভারিসহ):</span>
+                    <span className="text-[#B8860B] text-sm">৳ {orderSuccess.total}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2.5">
+                <button
+                  onClick={() => {
+                    const phoneToCheck = orderSuccess.phone;
+                    setOrderSuccess({ show: false, orderId: '' });
+                    openMyOrdersModal(phoneToCheck);
+                  }}
+                  className="w-full bg-[#FAF5EB] text-[#111412] border border-[#D4AF37] font-bold py-3 rounded-sm uppercase tracking-wider text-xs hover:bg-[#D4AF37] transition-colors shadow-sm"
+                >
+                  📦 অর্ডার ট্র্যাক ও বিস্তারিত দেখুন
+                </button>
+                <button
+                  onClick={() => setOrderSuccess({ show: false, orderId: '' })}
+                  className="w-full bg-[#111412] text-[#D4AF37] font-bold py-3.5 rounded-sm uppercase tracking-widest text-xs hover:bg-[#D4AF37] hover:text-[#111412] transition-colors border border-[#D4AF37] shadow-md"
+                >
+                  ওকে, ধন্যবাদ
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1799,40 +1974,40 @@ export default function Home() {
           const actualStock = viewingProduct.stock_count !== undefined ? viewingProduct.stock_count : stockLeftVisual;
 
           return (
-            <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto z-[1000]" onClick={closeProductModal}>
-              <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[95vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden pb-16 md:pb-0" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-4 md:px-8 md:py-5 shadow-sm sticky top-0 z-30">
-                  <button onClick={closeProductModal} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white px-5 py-2.5 rounded-sm shadow-sm">
-                    <span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান
+            <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-2 md:p-4 overflow-y-auto z-[1000]" onClick={closeProductModal}>
+              <div className="bg-white border-2 border-[#D4AF37] max-w-5xl w-full h-[94vh] md:h-auto md:max-h-[95vh] flex flex-col relative rounded-sm shadow-2xl overflow-hidden pb-16 md:pb-0" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-3.5 md:px-8 md:py-5 shadow-sm sticky top-0 z-30">
+                  <button onClick={closeProductModal} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.15em] text-xs transition-colors bg-white border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-white px-4 py-2 rounded-sm shadow-sm">
+                    <span className="text-lg leading-none -mt-0.5">←</span> ফিরে যান
                   </button>
-                  <button onClick={closeProductModal} className="text-[#111412] hover:text-red-600 text-3xl font-light transition-colors">✕</button>
+                  <button onClick={closeProductModal} className="text-[#111412] hover:text-red-600 text-2xl md:text-3xl font-light transition-colors">✕</button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-[#FAF5EB] relative">
-                  <div className="mb-6">
-                    <p className="text-gray-500 text-[11px] mb-1.5 font-bold tracking-widest uppercase">
+                  <div className="mb-5">
+                    <p className="text-gray-500 text-[10px] md:text-[11px] mb-1 font-bold tracking-widest uppercase">
                       হোম / {viewingProduct.tag || viewingProduct.category.split(',')[0]}
                     </p>
-                    {viewingProduct.name && <h2 className="text-2xl md:text-3xl font-bold text-[#111412] leading-tight" style={{ color: storeSettings.heading_color || '#B8860B' }}>{viewingProduct.name}</h2>}
+                    {viewingProduct.name && <h2 className="text-xl md:text-3xl font-bold text-[#111412] leading-tight" style={{ color: storeSettings.heading_color || '#B8860B' }}>{viewingProduct.name}</h2>}
                   </div>
 
-                  <div className="flex flex-col md:flex-row gap-10 relative">
-                    <div className="w-full md:w-1/2 flex flex-col gap-6">
+                  <div className="flex flex-col md:flex-row gap-6 md:gap-10 relative">
+                    <div className="w-full md:w-1/2 flex flex-col gap-4 md:gap-6">
                       {[viewingProduct.image_url, viewingProduct.image_url_2, viewingProduct.image_url_3, viewingProduct.image_url_4].filter(Boolean).map((img, idx) => (
                         <div key={idx} className="w-full bg-white rounded-sm border border-[#EADFC8] flex items-center justify-center p-2 overflow-hidden shadow-sm relative group cursor-zoom-in">
-                          <img src={img as string} loading="lazy" className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.5] origin-center" />
+                          <img src={img as string} loading="lazy" alt={viewingProduct.name} className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.3] origin-center" />
                         </div>
                       ))}
                     </div>
 
                     <div className="w-full md:w-1/2 flex flex-col md:sticky md:top-8 h-fit">
-                      <div className="flex items-end gap-4 mb-5 border-b border-[#D4AF37]/30 pb-5">
-                        {viewingProduct.original_price && <span className="text-gray-400 line-through text-lg font-medium">৳ {formatPrice(viewingProduct.original_price)}</span>}
-                        <span className="text-[#111412] text-3xl font-black">{formatPrice(viewingProduct.price)} ৳</span>
-                        {viewingDiscount > 0 && !isSoldOut && <span className="bg-red-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-sm ml-2 mb-1.5 animate-pulse shadow-sm">{viewingDiscount}% ছাড়</span>}
+                      <div className="flex items-end gap-4 mb-4 border-b border-[#D4AF37]/30 pb-4">
+                        {viewingProduct.original_price && <span className="text-gray-400 line-through text-base md:text-lg font-medium">৳ {formatPrice(viewingProduct.original_price)}</span>}
+                        <span className="text-[#111412] text-2xl md:text-3xl font-black">{formatPrice(viewingProduct.price)} ৳</span>
+                        {viewingDiscount > 0 && !isSoldOut && <span className="bg-red-500 text-white text-[10px] md:text-[11px] font-bold px-2.5 py-1 rounded-sm ml-2 mb-1 animate-pulse shadow-sm">{viewingDiscount}% ছাড়</span>}
                       </div>
 
-                      <div className="flex flex-col gap-2 mb-6 text-xs text-gray-600 font-bold tracking-wide">
+                      <div className="flex flex-col gap-2 mb-5 text-xs text-gray-600 font-bold tracking-wide">
                         <p className="flex items-center gap-2"><span className="text-base">🎁</span> প্রোডাক্ট আইডি: {viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}</p>
                         <p className="flex items-center gap-2 text-red-500 animate-pulse"><span className="text-base">🔥</span> {liveVisitors} জন এই মুহূর্তে দেখছেন</p>
                         {!isSoldOut ? (
@@ -1843,7 +2018,7 @@ export default function Home() {
                       </div>
 
                       {storeSettings.free_delivery_threshold > 0 && (
-                        <div className="bg-[#FAF5EB] border border-[#D4AF37]/50 px-4 py-3 rounded-sm flex items-center gap-3 w-full mb-8 shadow-sm">
+                        <div className="bg-[#FAF5EB] border border-[#D4AF37]/50 px-4 py-3 rounded-sm flex items-center gap-3 w-full mb-6 shadow-sm">
                           <span className="text-2xl leading-none">🚚</span>
                           {getNumericPrice(viewingProduct.price) >= storeSettings.free_delivery_threshold ? (
                             <p className="text-green-600 font-bold text-[11px] uppercase tracking-widest">এই প্রোডাক্টটিতে ফ্রি ডেলিভারি!</p>
@@ -1858,52 +2033,52 @@ export default function Home() {
                         </div>
                       )}
 
-                      <div className="flex flex-col gap-3.5 mb-10 hidden md:flex">
-                        <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={isSoldOut} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 text-sm font-bold flex justify-center items-center tracking-[0.2em] uppercase shadow-md disabled:bg-gray-300 disabled:text-gray-500 disabled:border-gray-300">
+                      <div className="flex flex-col gap-3 mb-8">
+                        <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={isSoldOut} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-3.5 md:py-4 rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 text-xs md:text-sm font-bold flex justify-center items-center tracking-[0.15em] uppercase shadow-md disabled:bg-gray-300 disabled:text-gray-500 disabled:border-gray-300">
                           ⚡ সরাসরি অর্ডার করুন
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); }} disabled={isSoldOut} className="w-full bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] font-bold py-4 rounded-sm hover:bg-[#EADFC8] transition-colors duration-300 text-sm flex justify-center items-center tracking-[0.2em] uppercase shadow-sm disabled:bg-gray-100 disabled:text-gray-400">
+                        <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); }} disabled={isSoldOut} className="w-full bg-white text-[#111412] border border-[#EADFC8] font-bold py-3.5 md:py-4 rounded-sm hover:bg-[#EADFC8] transition-colors duration-300 text-xs md:text-sm flex justify-center items-center tracking-[0.15em] uppercase shadow-sm disabled:bg-gray-100 disabled:text-gray-400">
                           🛒 ব্যাগে যোগ করুন
                         </button>
-                        <a href={`https://wa.me/88${storeSettings.phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম, আমি এই প্রোডাক্টটি নিতে চাই:\n\nনাম: ${viewingProduct.name}\nদাম: ৳${viewingProduct.price}\nআইডি: ${viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm uppercase">
-                          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z" /></svg>
+                        <a href={`https://wa.me/${formattedWaPhone}?text=${encodeURIComponent(`আসসালামু আলাইকুম, আমি এই প্রোডাক্টটি নিতে চাই:\n\nনাম: ${viewingProduct.name}\nদাম: ৳${viewingProduct.price}\nআইডি: ${viewingProduct.id.split('-')[0].toUpperCase().substring(0, 6)}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white font-bold py-3.5 md:py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 text-xs md:text-sm flex justify-center items-center gap-2 tracking-widest shadow-sm uppercase">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z" /></svg>
                           হোয়াটসঅ্যাপে অর্ডার
                         </a>
                       </div>
 
-                      <div className="bg-[#111412] p-6 rounded-sm border border-[#D4AF37] shadow-[0_5px_20px_rgba(212,175,55,0.15)] mt-4">
-                        <h4 className="text-sm font-bold mb-4 uppercase tracking-widest border-b border-[#D4AF37]/30 pb-2 inline-block text-[#D4AF37]">PRODUCT DETAILS</h4>
-                        <div className="text-[14px] leading-relaxed font-medium mt-2 text-[#EADFC8] custom-html-content" dangerouslySetInnerHTML={{ __html: (viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।").replace(/\n/g, '<br/>') }} />
+                      <div className="bg-[#111412] p-5 md:p-6 rounded-sm border border-[#D4AF37] shadow-[0_5px_20px_rgba(212,175,55,0.15)]">
+                        <h4 className="text-xs md:text-sm font-bold mb-3 uppercase tracking-widest border-b border-[#D4AF37]/30 pb-2 inline-block text-[#D4AF37]">PRODUCT DETAILS</h4>
+                        <div className="text-[13px] md:text-[14px] leading-relaxed font-medium mt-1 text-[#EADFC8] custom-html-content" dangerouslySetInnerHTML={{ __html: (viewingProduct.description || "অত্যন্ত প্রিমিয়াম কোয়ালিটি পণ্য। নিশ্চিন্তে অর্ডার করতে পারেন।").replace(/\n/g, '<br/>') }} />
                       </div>
                     </div>
                   </div>
 
-                  <div className="border-t border-[#EADFC8] pt-12 mt-16 pb-6">
-                    <h3 className="text-2xl font-bold mb-10 border-l-4 border-[#D4AF37] pl-5 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>কাস্টমার রিভিউ ({productReviews.length})</h3>
-                    <div className="flex flex-col md:flex-row gap-10">
-                      <form onSubmit={handleReviewSubmit} className="w-full md:w-1/3 bg-white p-8 rounded-sm border border-[#EADFC8] shadow-sm h-fit">
-                        <h4 className="text-xs font-bold mb-6 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>আপনার মতামত জানান</h4>
-                        <div className="flex gap-2 mb-6">
+                  <div className="border-t border-[#EADFC8] pt-10 mt-12 pb-6">
+                    <h3 className="text-xl md:text-2xl font-bold mb-8 border-l-4 border-[#D4AF37] pl-4 uppercase tracking-[0.15em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>কাস্টমার রিভিউ ({productReviews.length})</h3>
+                    <div className="flex flex-col md:flex-row gap-8">
+                      <form onSubmit={handleReviewSubmit} className="w-full md:w-1/3 bg-white p-6 rounded-sm border border-[#EADFC8] shadow-sm h-fit">
+                        <h4 className="text-xs font-bold mb-4 uppercase tracking-[0.2em]" style={{ color: storeSettings.heading_color || '#B8860B' }}>আপনার মতামত জানান</h4>
+                        <div className="flex gap-2 mb-4">
                           {[1, 2, 3, 4, 5].map(star => (
-                            <span key={star} onClick={() => setNewReviewRating(star)} className={`cursor-pointer text-3xl transition-colors ${star <= newReviewRating ? 'text-[#D4AF37]' : 'text-gray-300 hover:text-[#D4AF37]/50'}`}>★</span>
+                            <span key={star} onClick={() => setNewReviewRating(star)} className={`cursor-pointer text-2xl md:text-3xl transition-colors ${star <= newReviewRating ? 'text-[#D4AF37]' : 'text-gray-300 hover:text-[#D4AF37]/50'}`}>★</span>
                           ))}
                         </div>
-                        <input type="text" placeholder="আপনার নাম" value={newReviewName} onChange={e => setNewReviewName(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-4 outline-none focus:border-[#D4AF37] transition-colors shadow-inner" required />
-                        <textarea required placeholder="প্রোডাক্টটি কেমন লেগেছে?" value={newReviewComment} onChange={e => setNewReviewComment(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] mb-6 outline-none focus:border-[#D4AF37] transition-colors custom-scrollbar shadow-inner" rows={4}></textarea>
-                        <button type="submit" disabled={isReviewSubmitting} className="w-full bg-[#111412] text-[#D4AF37] py-4 rounded-sm text-xs font-bold hover:bg-[#D4AF37] hover:text-[#111412] border border-[#D4AF37] transition-colors duration-300 shadow-sm tracking-[0.2em] uppercase">
+                        <input type="text" placeholder="আপনার নাম" value={newReviewName} onChange={e => setNewReviewName(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3 rounded-sm text-sm text-[#111412] mb-3 outline-none focus:border-[#D4AF37] transition-colors shadow-inner" required />
+                        <textarea required placeholder="প্রোডাক্টটি কেমন লেগেছে?" value={newReviewComment} onChange={e => setNewReviewComment(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3 rounded-sm text-sm text-[#111412] mb-4 outline-none focus:border-[#D4AF37] transition-colors custom-scrollbar shadow-inner" rows={3}></textarea>
+                        <button type="submit" disabled={isReviewSubmitting} className="w-full bg-[#111412] text-[#D4AF37] py-3.5 rounded-sm text-xs font-bold hover:bg-[#D4AF37] hover:text-[#111412] border border-[#D4AF37] transition-colors duration-300 shadow-sm tracking-[0.2em] uppercase">
                           {isReviewSubmitting ? 'Submitting...' : 'Submit Review'}
                         </button>
                       </form>
-                      <div className="w-full md:w-2/3 space-y-6 max-h-[450px] overflow-y-auto custom-scrollbar pr-4">
+                      <div className="w-full md:w-2/3 space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                         {productReviews.length === 0 ? (
-                          <p className="text-xs text-gray-500 bg-white p-12 text-center border border-dashed border-[#D4AF37]/50 rounded-sm font-bold tracking-[0.2em] uppercase shadow-sm">এখনো কোনো রিভিউ নেই। আপনিই প্রথম রিভিউ দিন!</p>
+                          <p className="text-xs text-gray-500 bg-white p-10 text-center border border-dashed border-[#D4AF37]/50 rounded-sm font-bold tracking-[0.2em] uppercase shadow-sm">এখনো কোনো রিভিউ নেই। আপনিই প্রথম রিভিউ দিন!</p>
                         ) : productReviews.map(review => (
-                          <div key={review.id} className="bg-white border border-[#EADFC8] p-6 rounded-sm shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
-                            <div className="flex justify-between items-center mb-4">
+                          <div key={review.id} className="bg-white border border-[#EADFC8] p-5 rounded-sm shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
+                            <div className="flex justify-between items-center mb-3">
                               <span className="font-bold text-sm text-[#111412] uppercase tracking-[0.1em]">{review.customer_name}</span>
-                              <span className="text-[#D4AF37] text-lg tracking-widest">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
+                              <span className="text-[#D4AF37] text-base tracking-widest">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
                             </div>
-                            <p className="text-sm mb-4 font-medium leading-relaxed" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{review.comment}</p>
+                            <p className="text-sm mb-3 font-medium leading-relaxed" style={{ color: storeSettings.page_text_color || '#4B5563' }}>{review.comment}</p>
                             <p className="text-[10px] text-[#B8860B] font-bold tracking-[0.2em] uppercase">{new Date(review.created_at).toLocaleDateString()}</p>
                           </div>
                         ))}
@@ -1912,12 +2087,12 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="md:hidden absolute bottom-0 left-0 w-full bg-white border-t border-[#EADFC8] p-3 shadow-[0_-5px_15px_rgba(0,0,0,0.1)] flex gap-3 z-50 animate-slide-up">
-                  <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); }} disabled={isSoldOut} className="flex-1 bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[11px] font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 uppercase tracking-widest shadow-sm disabled:text-gray-400">
-                    🛒 ব্যাগে
+                <div className="md:hidden absolute bottom-0 left-0 w-full bg-white border-t border-[#EADFC8] p-2.5 shadow-[0_-5px_15px_rgba(0,0,0,0.1)] flex gap-2.5 z-50">
+                  <button onClick={(e) => { e.stopPropagation(); addToCart(viewingProduct, 1); }} disabled={isSoldOut} className="flex-1 bg-[#FAF5EB] text-[#111412] border border-[#EADFC8] text-[11px] font-bold py-3 rounded-sm flex items-center justify-center gap-1.5 uppercase tracking-wider shadow-sm disabled:text-gray-400">
+                    🛒 ব্যাগে যোগ
                   </button>
-                  <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={isSoldOut} className="flex-1 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[11px] font-bold py-3.5 rounded-sm flex items-center justify-center gap-2 uppercase tracking-widest shadow-md disabled:bg-gray-300 disabled:text-gray-500">
-                    ⚡ অর্ডার
+                  <button onClick={(e) => handleDirectOrder(viewingProduct, 1, e)} disabled={isSoldOut} className="flex-1 bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[11px] font-bold py-3 rounded-sm flex items-center justify-center gap-1.5 uppercase tracking-wider shadow-md disabled:bg-gray-300 disabled:text-gray-500">
+                    ⚡ অর্ডার করুন
                   </button>
                 </div>
               </div>
@@ -1926,92 +2101,91 @@ export default function Home() {
         })()}
 
         {isCheckoutOpen && (
-          <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 z-[1000]" onClick={() => setIsCheckoutOpen(false)}>
-            <div className="bg-white border-2 border-[#D4AF37] w-full max-w-md relative rounded-sm shadow-2xl flex flex-col overflow-hidden max-h-[95vh]" onClick={e => e.stopPropagation()}>
-              <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-5">
-                <button onClick={() => setIsCheckoutOpen(false)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white border border-[#EADFC8] hover:border-[#D4AF37] px-3 py-1.5 rounded-sm shadow-sm">
+          <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-3 md:p-4 z-[1000]" onClick={() => setIsCheckoutOpen(false)}>
+            <div className="bg-white border-2 border-[#D4AF37] w-full max-w-md relative rounded-sm shadow-2xl flex flex-col overflow-hidden max-h-[94vh]" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center bg-[#FAF5EB] border-b border-[#EADFC8] p-4 md:p-5">
+                <button onClick={() => setIsCheckoutOpen(false)} className="flex items-center gap-1.5 text-[#111412] font-bold uppercase tracking-[0.15em] text-xs transition-colors bg-white border border-[#EADFC8] hover:border-[#D4AF37] px-3 py-1.5 rounded-sm shadow-sm">
                   <span className="text-lg leading-none -mt-0.5">←</span> Back
                 </button>
-                <h3 className="text-[13px] font-bold text-[#B8860B] tracking-[0.2em] uppercase">হোম ডেলিভারির তথ্য</h3>
+                <h3 className="text-[12px] md:text-[13px] font-bold text-[#B8860B] tracking-[0.15em] uppercase">হোম ডেলিভারির তথ্য</h3>
                 <button onClick={() => setIsCheckoutOpen(false)} className="text-[#111412] hover:text-red-500 text-2xl font-light transition-colors">✕</button>
               </div>
-              <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
-                <form onSubmit={handleCheckoutSubmit} className="space-y-6">
+              <div className="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
+                <form onSubmit={handleCheckoutSubmit} className="space-y-5">
                   <div>
-                    <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">👤 আপনার নাম লিখুন</label>
-                    <input required value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
+                    <label className="text-[10px] font-bold text-[#B8860B] mb-1.5 flex items-center gap-2 uppercase tracking-[0.15em]">👤 আপনার নাম লিখুন <span className="text-red-500">*</span></label>
+                    <input required placeholder="আপনার সম্পূর্ণ নাম" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">📱 মোবাইল নাম্বার (01XXXXXXXXX) <span className="text-red-500">*</span></label>
-                    <input required placeholder="017xxxxxxxx" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} onBlur={handlePhoneBlur} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
+                    <label className="text-[10px] font-bold text-[#B8860B] mb-1.5 flex items-center gap-2 uppercase tracking-[0.15em]">📱 মোবাইল নাম্বার (১১ ডিজিট) <span className="text-red-500">*</span></label>
+                    <input required placeholder="017xxxxxxxx" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} onBlur={handlePhoneBlur} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-[#B8860B] mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">🏠 ডেলিভারি ঠিকানা <span className="text-red-500">*</span></label>
-                    <textarea required rows={2} placeholder="সম্পূর্ণ ঠিকানা লিখুন (জেলা, থানা সহ)" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner custom-scrollbar transition-colors"></textarea>
+                    <label className="text-[10px] font-bold text-[#B8860B] mb-1.5 flex items-center gap-2 uppercase tracking-[0.15em]">🏠 ডেলিভারি ঠিকানা <span className="text-red-500">*</span></label>
+                    <textarea required rows={2} placeholder="সম্পূর্ণ ঠিকানা লিখুন (বাসা/রোড, থানা, জেলা)" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner custom-scrollbar transition-colors"></textarea>
                   </div>
 
-                  <div className="bg-[#FAF5EB] p-5 border border-[#EADFC8] rounded-sm shadow-sm">
-                    <label className="text-[10px] font-bold text-[#B8860B] mb-4 flex items-center gap-2 uppercase tracking-[0.2em]">💳 পেমেন্ট পদ্ধতি</label>
-                    <div className="flex flex-wrap gap-2.5">
-                      <button type="button" onClick={() => setPaymentMethod('COD')} className={`flex-1 min-w-[100px] py-3 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod === 'COD' ? 'bg-[#111412] text-[#D4AF37] border-[#D4AF37]' : 'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>Cash on Delivery</button>
-                      <button type="button" onClick={() => setPaymentMethod('bKash')} className={`flex-1 min-w-[80px] py-3 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod === 'bKash' ? 'bg-[#e2136e] text-white border-[#e2136e]' : 'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>bKash</button>
-                      <button type="button" onClick={() => setPaymentMethod('Nagad')} className={`flex-1 min-w-[80px] py-3 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod === 'Nagad' ? 'bg-[#F58220] text-white border-[#F58220]' : 'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>Nagad</button>
+                  <div className="bg-[#FAF5EB] p-4 border border-[#EADFC8] rounded-sm shadow-sm">
+                    <label className="text-[10px] font-bold text-[#B8860B] mb-3 flex items-center gap-2 uppercase tracking-[0.15em]">💳 পেমেন্ট পদ্ধতি</label>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => setPaymentMethod('COD')} className={`flex-1 min-w-[100px] py-2.5 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod === 'COD' ? 'bg-[#111412] text-[#D4AF37] border-[#D4AF37]' : 'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>Cash on Delivery</button>
+                      <button type="button" onClick={() => setPaymentMethod('bKash')} className={`flex-1 min-w-[75px] py-2.5 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod === 'bKash' ? 'bg-[#e2136e] text-white border-[#e2136e]' : 'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>bKash</button>
+                      <button type="button" onClick={() => setPaymentMethod('Nagad')} className={`flex-1 min-w-[75px] py-2.5 text-[11px] font-bold border rounded-sm transition-colors duration-300 tracking-wider uppercase ${paymentMethod === 'Nagad' ? 'bg-[#F58220] text-white border-[#F58220]' : 'bg-white text-gray-600 border-[#EADFC8] hover:border-[#D4AF37]'}`}>Nagad</button>
                     </div>
                     {paymentMethod !== 'COD' && (
-                      <div className="bg-white border border-[#EADFC8] p-5 rounded-sm mt-4 shadow-inner">
-                        <p className="text-[10px] font-bold text-[#111412] mb-3 uppercase tracking-[0.2em] leading-relaxed">এই নম্বরে Send Money করুন: <br /><span className="text-xl text-[#D4AF37] bg-[#111412] px-3 py-1 rounded-sm tracking-[0.2em] inline-block mt-2 border border-[#D4AF37]">{storeSettings.phone}</span></p>
-                        <input type="text" required placeholder={`${paymentMethod} TrxID দিন`} value={transactionId} onChange={e => setTransactionId(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors mt-2" />
+                      <div className="bg-white border border-[#EADFC8] p-4 rounded-sm mt-3 shadow-inner">
+                        <p className="text-[10px] font-bold text-[#111412] mb-2 uppercase tracking-[0.15em] leading-relaxed">এই নম্বরে Send Money করুন: <br /><span className="text-lg text-[#D4AF37] bg-[#111412] px-3 py-1 rounded-sm tracking-[0.15em] inline-block mt-1.5 border border-[#D4AF37]">{storeSettings.phone}</span></p>
+                        <input type="text" required placeholder={`${paymentMethod} TrxID দিন`} value={transactionId} onChange={e => setTransactionId(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-2.5 text-sm text-[#111412] rounded-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors mt-1" />
                       </div>
                     )}
                   </div>
 
-                  <div className="pt-2">
-                    <label className="text-[10px] font-bold text-[#B8860B] mb-3 flex items-center gap-2 uppercase tracking-[0.2em]">🚚 ডেলিভারি চার্জ</label>
-                    <div className="flex flex-col gap-3 bg-[#FAF5EB] p-5 rounded-sm border border-[#EADFC8] shadow-sm">
-                      <label className="flex items-center gap-3 text-sm text-[#111412] font-bold cursor-pointer">
+                  <div>
+                    <label className="text-[10px] font-bold text-[#B8860B] mb-2.5 flex items-center gap-2 uppercase tracking-[0.15em]">🚚 ডেলিভারি এলাকা</label>
+                    <div className="flex flex-col gap-2.5 bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm">
+                      <label className="flex items-center gap-3 text-xs md:text-sm text-[#111412] font-bold cursor-pointer">
                         <input type="radio" name="shipping" checked={shippingLocation === 'inside'} onChange={() => setShippingLocation('inside')} className="accent-[#D4AF37] w-4 h-4 cursor-pointer" />
                         <span>ঢাকার ভিতরে {isFreeDelivery ? <><del className="text-gray-400">৳ ৬০</del> <span className="text-green-600 bg-green-100 px-2 rounded-sm ml-1 text-xs">FREE</span></> : '(৳ ৬০)'}</span>
                       </label>
-                      <label className="flex items-center gap-3 text-sm text-[#111412] font-bold cursor-pointer">
+                      <label className="flex items-center gap-3 text-xs md:text-sm text-[#111412] font-bold cursor-pointer">
                         <input type="radio" name="shipping" checked={shippingLocation === 'outside'} onChange={() => setShippingLocation('outside')} className="accent-[#D4AF37] w-4 h-4 cursor-pointer" />
                         <span>ঢাকার বাইরে {isFreeDelivery ? <><del className="text-gray-400">৳ ১২০</del> <span className="text-green-600 bg-green-100 px-2 rounded-sm ml-1 text-xs">FREE</span></> : '(৳ ১২০)'}</span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="border border-[#EADFC8] bg-white rounded-sm mt-6 overflow-hidden shadow-sm">
+                  <div className="border border-[#EADFC8] bg-white rounded-sm mt-4 overflow-hidden shadow-sm">
                     {cart.map((item, index) => (
-                      <div key={`${item.id}-${index}`} className="flex border-b border-[#EADFC8] last:border-0 p-3 items-center text-sm">
-                        <div className="w-16 h-16 border border-[#EADFC8] mr-4 shrink-0 rounded-sm overflow-hidden bg-[#FAF5EB]">
-                          <img src={item.image_url || ''} loading="lazy" className="w-full h-full object-cover" />
+                      <div key={`${item.id}-${index}`} className="flex border-b border-[#EADFC8] last:border-0 p-2.5 items-center text-sm">
+                        <div className="w-12 h-12 border border-[#EADFC8] mr-3 shrink-0 rounded-sm overflow-hidden bg-[#FAF5EB]">
+                          <img src={item.image_url || ''} loading="lazy" alt={item.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 leading-tight">
-                          <p className="font-bold text-[#111412] text-[13px] line-clamp-1">{item.name}</p>
-                          <p className="text-[11px] text-[#B8860B] font-black mt-1.5">৳ {formatPrice(item.price)} X {item.quantity}</p>
+                          <p className="font-bold text-[#111412] text-xs line-clamp-1">{item.name}</p>
+                          <p className="text-[11px] text-[#B8860B] font-black mt-1">৳ {formatPrice(item.price)} × {item.quantity}</p>
                         </div>
-                        <div className="flex flex-col items-center border-l border-r border-[#EADFC8] px-3 h-full justify-center gap-2 bg-[#FAF5EB]">
-                          <button type="button" onClick={() => updateQuantity(item.id, 1)} className="font-black text-xl leading-none cursor-pointer text-[#111412] hover:text-[#D4AF37] transition-colors">+</button>
-                          <span className="text-xs font-bold text-[#111412] leading-none">{item.quantity}</span>
-                          <button type="button" onClick={() => updateQuantity(item.id, -1)} className="font-black text-xl leading-none cursor-pointer text-[#111412] hover:text-[#D4AF37] transition-colors">-</button>
+                        <div className="flex items-center border border-[#EADFC8] px-2 py-1 gap-2.5 bg-[#FAF5EB] rounded-sm">
+                          <button type="button" onClick={() => updateQuantity(item.id, -1)} className="font-black text-base leading-none text-[#111412] hover:text-[#D4AF37]">-</button>
+                          <span className="text-xs font-bold text-[#111412]">{item.quantity}</span>
+                          <button type="button" onClick={() => updateQuantity(item.id, 1)} className="font-black text-base leading-none text-[#111412] hover:text-[#D4AF37]">+</button>
                         </div>
-                        <div className="px-4 flex items-center justify-between min-w-[90px]">
-                          <span className="font-black text-[#111412] text-sm">{(getNumericPrice(item.price) * item.quantity).toString()}৳</span>
-                          <button type="button" onClick={() => removeFromCart(item.id)} className="text-red-500 font-bold ml-3 hover:bg-red-50 px-2 py-1 rounded-sm transition-colors text-lg leading-none">✕</button>
+                        <div className="pl-3 flex items-center">
+                          <button type="button" onClick={() => removeFromCart(item.id)} className="text-red-500 font-bold hover:bg-red-50 p-1 rounded-sm text-base leading-none">✕</button>
                         </div>
                       </div>
                     ))}
 
-                    <div className="flex justify-between items-center p-5 bg-[#FAF5EB] border-t border-[#EADFC8] font-bold text-sm text-[#111412]">
-                      <span className="uppercase tracking-[0.2em] text-[#B8860B] text-xs">Total:-</span>
-                      <div className="flex items-center gap-8 pr-1">
-                        <span className="text-sm text-gray-600">{totalItemsCount} items</span>
-                        <span className="text-[#111412] text-[18px] font-black">{cartTotal.toString()} ৳</span>
+                    <div className="flex justify-between items-center p-4 bg-[#FAF5EB] border-t border-[#EADFC8] font-bold text-sm text-[#111412]">
+                      <span className="uppercase tracking-[0.15em] text-[#B8860B] text-xs">সর্বমোট বিল:</span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-xs text-gray-600">{totalItemsCount} টি পণ্য</span>
+                        <span className="text-[#111412] text-lg font-black">{cartTotal} ৳</span>
                       </div>
                     </div>
                   </div>
 
-                  <button type="submit" disabled={isCheckingOut} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-4.5 text-[15px] rounded-sm mt-8 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 shadow-md flex items-center justify-center gap-2 uppercase tracking-[0.2em]">
-                    {isCheckingOut ? "Processing..." : `অর্ডার করুন ৳ ${cartTotal}`}
+                  <button type="submit" disabled={isCheckingOut} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-4 text-sm rounded-sm mt-4 hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 shadow-md flex items-center justify-center gap-2 uppercase tracking-[0.15em]">
+                    {isCheckingOut ? "অর্ডার প্রসেস হচ্ছে..." : `অর্ডার কনফার্ম করুন (৳ ${cartTotal})`}
                   </button>
                 </form>
               </div>
@@ -2021,12 +2195,12 @@ export default function Home() {
 
         {isCartOpen && (
           <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-sm flex justify-end z-[1000]" onClick={() => setIsCartOpen(false)}>
-            <div className="bg-white w-full max-w-sm h-full p-8 relative flex flex-col shadow-2xl border-l-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
+            <div className="bg-white w-full max-w-sm h-full p-6 md:p-8 relative flex flex-col shadow-2xl border-l-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
               <button onClick={() => setIsCartOpen(false)} className="absolute top-6 right-6 text-3xl text-gray-400 hover:text-[#111412] transition-colors leading-none">✕</button>
-              <h3 className="text-xl font-bold mb-6 border-b border-[#EADFC8] pb-5 text-[#B8860B] tracking-[0.2em] uppercase">শপিং ব্যাগ</h3>
+              <h3 className="text-xl font-bold mb-6 border-b border-[#EADFC8] pb-4 text-[#B8860B] tracking-[0.2em] uppercase">শপিং ব্যাগ</h3>
 
               {storeSettings.free_delivery_threshold > 0 && cart.length > 0 && (
-                <div className="mb-4 bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm">
+                <div className="mb-4 bg-[#FAF5EB] p-3.5 rounded-sm border border-[#EADFC8] shadow-sm">
                   {isFreeDelivery ? (
                     <p className="text-green-600 font-bold text-[11px] flex items-center gap-2 uppercase tracking-widest"><span className="text-base">🎉</span> ফ্রি ডেলিভারি আনলক হয়েছে!</p>
                   ) : (
@@ -2040,22 +2214,22 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 mt-2">
+              <div className="flex-1 overflow-y-auto space-y-3.5 custom-scrollbar pr-1 mt-1">
                 {cart.map((item, index) => (
-                  <div key={`${item.id}-${index}`} className="flex items-center justify-between bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
-                    <div className="flex gap-4 items-center w-2/3">
-                      <img src={item.image_url || ''} loading="lazy" className="w-16 h-16 border border-[#EADFC8] bg-white rounded-sm object-cover shrink-0" />
+                  <div key={`${item.id}-${index}`} className="flex items-center justify-between bg-[#FAF5EB] p-3.5 rounded-sm border border-[#EADFC8] shadow-sm">
+                    <div className="flex gap-3 items-center w-2/3">
+                      <img src={item.image_url || ''} loading="lazy" alt={item.name} className="w-14 h-14 border border-[#EADFC8] bg-white rounded-sm object-cover shrink-0" />
                       <div>
                         <p className="text-[12px] font-bold text-[#111412] leading-tight line-clamp-2">{item.name}</p>
-                        <p className="text-[11px] font-black mt-2 text-[#B8860B]">{formatPrice(item.price)} x {item.quantity}</p>
+                        <p className="text-[11px] font-black mt-1.5 text-[#B8860B]">{formatPrice(item.price)} × {item.quantity}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-3">
+                    <div className="flex flex-col items-end gap-2.5">
                       <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-[9px] font-bold hover:underline uppercase tracking-wider">Remove</button>
                       <div className="flex items-center border border-[#EADFC8] rounded-sm bg-white overflow-hidden shadow-sm">
-                        <button onClick={() => updateQuantity(item.id, -1)} className="px-3 py-1 font-bold text-[#111412] hover:bg-[#FAF5EB] transition-colors">-</button>
-                        <span className="px-3 text-xs font-bold border-x border-[#EADFC8] py-1.5 text-[#111412] bg-[#FAF5EB]">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, 1)} className="px-3 py-1 font-bold text-[#111412] hover:bg-[#FAF5EB] transition-colors">+</button>
+                        <button onClick={() => updateQuantity(item.id, -1)} className="px-2.5 py-1 font-bold text-[#111412] hover:bg-[#FAF5EB]">-</button>
+                        <span className="px-2.5 text-xs font-bold border-x border-[#EADFC8] py-1 text-[#111412] bg-[#FAF5EB]">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, 1)} className="px-2.5 py-1 font-bold text-[#111412] hover:bg-[#FAF5EB]">+</button>
                       </div>
                     </div>
                   </div>
@@ -2064,12 +2238,12 @@ export default function Home() {
               </div>
 
               {cart.length > 0 && (
-                <div className="mt-6 bg-[#FAF5EB] p-6 rounded-sm shadow-sm border border-[#EADFC8]">
-                  <div className="flex justify-between font-black text-xl mb-6 text-[#111412] border-b border-[#EADFC8] pb-4">
-                    <span className="uppercase tracking-[0.2em] text-[11px] text-[#B8860B] mt-1">সাবটোটাল:</span>
+                <div className="mt-4 bg-[#FAF5EB] p-5 rounded-sm shadow-sm border border-[#EADFC8]">
+                  <div className="flex justify-between font-black text-lg mb-4 text-[#111412] border-b border-[#EADFC8] pb-3">
+                    <span className="uppercase tracking-[0.15em] text-xs text-[#B8860B] mt-1">সাবটোটাল:</span>
                     <span>{itemsSubtotal} ৳</span>
                   </div>
-                  <button onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(true) }} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-4 text-xs rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md">চেকআউট করুন</button>
+                  <button onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] font-bold py-3.5 text-xs rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md">চেকআউট করুন</button>
                 </div>
               )}
             </div>
@@ -2078,25 +2252,25 @@ export default function Home() {
 
         {isWishlistOpen && (
           <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-sm flex justify-end z-[1000]" onClick={() => setIsWishlistOpen(false)}>
-            <div className="bg-white w-full max-w-sm h-full p-8 relative shadow-2xl flex flex-col border-l-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
+            <div className="bg-white w-full max-w-sm h-full p-6 md:p-8 relative shadow-2xl flex flex-col border-l-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
               <button onClick={() => setIsWishlistOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-[#111412] text-3xl transition-colors leading-none">✕</button>
-              <h3 className="text-xl font-bold mb-8 border-b border-[#EADFC8] pb-5 text-[#B8860B] tracking-[0.2em] uppercase">উইশলিস্ট ({wishlist.length})</h3>
+              <h3 className="text-xl font-bold mb-6 border-b border-[#EADFC8] pb-4 text-[#B8860B] tracking-[0.2em] uppercase">উইশলিস্ট ({wishlist.length})</h3>
 
-              <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+              <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-1">
                 {wishlist.length === 0 ? (
                   <p className="text-center text-gray-500 mt-16 font-bold tracking-[0.2em] uppercase text-xs border border-dashed border-[#D4AF37]/50 p-8 rounded-sm bg-[#FAF5EB]">উইশলিস্টে কিছু নেই।</p>
                 ) : wishlist.map(item => (
-                  <div key={item.id} className="flex justify-between items-center bg-[#FAF5EB] p-4 rounded-sm border border-[#EADFC8] shadow-sm hover:border-[#D4AF37]/50 transition-colors duration-300">
-                    <div className="flex items-center gap-4">
-                      <img src={item.image_url || ''} loading="lazy" className="w-16 h-16 border border-[#EADFC8] bg-white object-cover rounded-sm shadow-sm" />
+                  <div key={item.id} className="flex justify-between items-center bg-[#FAF5EB] p-3.5 rounded-sm border border-[#EADFC8] shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <img src={item.image_url || ''} loading="lazy" alt={item.name} className="w-14 h-14 border border-[#EADFC8] bg-white object-cover rounded-sm shadow-sm" />
                       <div>
                         <p className="text-[12px] font-bold text-[#111412] leading-tight line-clamp-2">{item.name}</p>
-                        <p className="text-[#B8860B] text-xs font-black mt-2">{formatPrice(item.price)} ৳</p>
+                        <p className="text-[#B8860B] text-xs font-black mt-1.5">{formatPrice(item.price)} ৳</p>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-4 items-end">
-                      <button onClick={() => { addToCart(item); setIsWishlistOpen(false); setIsCartOpen(true); }} className="bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[9px] px-3 py-2 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors uppercase tracking-[0.2em] shadow-sm">🛒 ব্যাগে</button>
-                      <button onClick={() => removeFromWishlist(item.id)} className="text-red-500 text-[9px] font-bold hover:underline uppercase tracking-wider text-center">Remove</button>
+                    <div className="flex flex-col gap-3 items-end">
+                      <button onClick={() => { addToCart(item); setIsWishlistOpen(false); setIsCartOpen(true); }} className="bg-[#111412] text-[#D4AF37] border border-[#D4AF37] text-[9px] px-3 py-1.5 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors uppercase tracking-wider shadow-sm">🛒 ব্যাগে</button>
+                      <button onClick={() => removeFromWishlist(item.id)} className="text-red-500 text-[9px] font-bold hover:underline uppercase tracking-wider">Remove</button>
                     </div>
                   </div>
                 ))}
@@ -2107,102 +2281,209 @@ export default function Home() {
 
         {showAuthModal && (
           <div className="fixed inset-0 bg-[#111412]/80 flex flex-col items-center justify-center p-4 backdrop-blur-md z-[1000]" onClick={() => setShowAuthModal(false)}>
-            <button onClick={() => setShowAuthModal(false)} className="bg-white text-[#111412] px-6 py-3 rounded-sm font-bold text-xs mb-8 hover:bg-[#FAF5EB] transition-colors shadow-lg border border-[#EADFC8] uppercase tracking-widest z-50">
+            <button onClick={() => setShowAuthModal(false)} className="bg-white text-[#111412] px-5 py-2.5 rounded-sm font-bold text-xs mb-6 hover:bg-[#FAF5EB] transition-colors shadow-lg border border-[#EADFC8] uppercase tracking-widest z-50">
               লগ-ইন ছাড়া অর্ডার করতে চাইলে এখানে ক্লিক করুন &gt;&gt;
             </button>
-            <div className="bg-white p-8 md:p-12 rounded-sm shadow-2xl w-full max-w-md relative border-t-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setShowAuthModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
-              <h2 className="text-2xl font-bold mb-6 text-[#B8860B] text-center tracking-[0.2em] uppercase mt-2">{authView === 'LOGIN' ? 'লগইন করুন' : 'অ্যাকাউন্ট খুলুন'}</h2>
-              <button onClick={handleGoogleLogin} disabled={authLoading} className="w-full bg-white border border-[#EADFC8] text-[#111412] py-3.5 rounded-sm font-bold text-[12px] hover:bg-[#FAF5EB] transition-colors mb-6 flex items-center justify-center gap-3 shadow-sm tracking-widest uppercase">
+            <div className="bg-white p-6 md:p-10 rounded-sm shadow-2xl w-full max-w-md relative border-t-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowAuthModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
+              <h2 className="text-xl md:text-2xl font-bold mb-6 text-[#B8860B] text-center tracking-[0.2em] uppercase">{authView === 'LOGIN' ? 'লগইন করুন' : 'অ্যাকাউন্ট খুলুন'}</h2>
+              <button onClick={handleGoogleLogin} disabled={authLoading} className="w-full bg-white border border-[#EADFC8] text-[#111412] py-3 rounded-sm font-bold text-[12px] hover:bg-[#FAF5EB] transition-colors mb-5 flex items-center justify-center gap-3 shadow-sm tracking-widest uppercase">
                 <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg"><g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)"><path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z" /><path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z" /><path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z" /><path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" /></g></svg>
                 Google দিয়ে কন্টিনিউ করুন
               </button>
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="h-[1px] bg-[#EADFC8] flex-1"></div>
                 <span className="text-center text-[#B8860B] text-[10px] font-bold tracking-[0.2em] uppercase">OR EMAIL</span>
                 <div className="h-[1px] bg-[#EADFC8] flex-1"></div>
               </div>
-              <form onSubmit={handleAuth} className="space-y-5">
-                <input type="email" required placeholder="ইমেইল এড্রেস" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
-                <input type="password" required placeholder="পাসওয়ার্ড" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
-                <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-4 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase mt-4 shadow-md text-xs">{authLoading ? 'অপেক্ষা করুন...' : (authView === 'LOGIN' ? 'লগইন করুন' : 'রেজিস্টার করুন')}</button>
+              <form onSubmit={handleAuth} className="space-y-4">
+                <input type="email" required placeholder="ইমেইল এড্রেস" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
+                <input type="password" required placeholder="পাসওয়ার্ড" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="w-full bg-[#FAF5EB] border border-[#EADFC8] p-3.5 rounded-sm text-sm text-[#111412] outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
+                <button type="submit" disabled={authLoading} className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] py-3.5 rounded-sm font-bold hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase shadow-md text-xs">{authLoading ? 'অপেক্ষা করুন...' : (authView === 'LOGIN' ? 'লগইন করুন' : 'রেজিস্টার করুন')}</button>
               </form>
-              <p className="text-[11px] text-center mt-8 text-gray-500 font-medium tracking-wide uppercase">
+              <p className="text-[11px] text-center mt-6 text-gray-500 font-medium tracking-wide uppercase">
                 {authView === 'LOGIN' ? 'অ্যাকাউন্ট নেই? ' : 'ইতিমধ্যেই অ্যাকাউন্ট আছে? '}
-                <span className="text-[#B8860B] font-black cursor-pointer hover:text-[#111412] transition-colors uppercase tracking-[0.2em] border-b border-transparent hover:border-[#111412] pb-0.5 ml-1" onClick={() => setAuthView(authView === 'LOGIN' ? 'REGISTER' : 'LOGIN')}>{authView === 'LOGIN' ? 'Register Now' : 'Login Here'}</span>
+                <span className="text-[#B8860B] font-black cursor-pointer hover:text-[#111412] transition-colors uppercase tracking-[0.15em] ml-1" onClick={() => setAuthView(authView === 'LOGIN' ? 'REGISTER' : 'LOGIN')}>{authView === 'LOGIN' ? 'Register Now' : 'Login Here'}</span>
               </p>
             </div>
           </div>
         )}
 
+        {/* ========================================================================= */}
+        {/* UPDATED USER PROFILE MODAL WITH DETAILED ORDERED ITEMS LIST               */}
+        {/* ========================================================================= */}
         {showProfileModal && user && (() => {
           const totalSpent = userOrders.filter(o => o.status === 'DELIVERED').reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
-          const loyaltyPoints = Math.floor(totalSpent / 20); // 1 point per 20 Tk spent
+          const loyaltyPoints = Math.floor(totalSpent / 20);
 
           return (
             <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 z-[1000]" onClick={() => setShowProfileModal(false)}>
-              <div className="bg-white border-2 border-[#D4AF37] p-10 rounded-sm shadow-2xl w-full max-w-md relative" onClick={e => e.stopPropagation()}>
-                <button onClick={() => setShowProfileModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
-                <div className="flex flex-col items-center mb-6 mt-2">
-                  <div className="w-24 h-24 bg-[#FAF5EB] border-2 border-[#D4AF37] rounded-full mb-5 flex items-center justify-center text-4xl font-bold text-[#D4AF37] overflow-hidden shadow-sm">
-                    {userData.avatar ? <img src={userData.avatar} className="w-full h-full object-cover" /> : user.email?.charAt(0).toUpperCase()}
+              <div className="bg-white border-2 border-[#D4AF37] p-6 md:p-8 rounded-sm shadow-2xl w-full max-w-lg relative max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setShowProfileModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-16 h-16 bg-[#FAF5EB] border-2 border-[#D4AF37] rounded-full flex items-center justify-center text-2xl font-bold text-[#D4AF37] overflow-hidden shadow-sm shrink-0">
+                    {userData.avatar ? <img src={userData.avatar} alt="" className="w-full h-full object-cover" /> : user.email?.charAt(0).toUpperCase()}
                   </div>
-                  <h2 className="text-2xl font-bold text-[#111412] tracking-[0.1em]">{userData.name || user.email?.split('@')[0]}</h2>
-                  <p className="text-[10px] text-[#B8860B] font-bold tracking-[0.2em] mt-2 uppercase">{user.email}</p>
+                  <div>
+                    <h2 className="text-xl font-bold text-[#111412]">{userData.name || user.email?.split('@')[0]}</h2>
+                    <p className="text-[10px] text-[#B8860B] font-bold tracking-widest mt-0.5 uppercase">{user.email}</p>
+                  </div>
                 </div>
 
-                {/* LOYALTY POINTS BOX */}
-                <div className="bg-gradient-to-r from-[#111412] to-[#2a2a2a] p-4 rounded-sm border border-[#D4AF37] shadow-lg mb-8 flex justify-between items-center">
+                <div className="bg-gradient-to-r from-[#111412] to-[#2a2a2a] p-4 rounded-sm border border-[#D4AF37] shadow-md mb-5 flex justify-between items-center">
                   <div>
-                    <p className="text-[9px] text-[#D4AF37] font-bold uppercase tracking-widest mb-1">Loyalty Points</p>
-                    <p className="text-2xl font-black text-white">{loyaltyPoints} <span className="text-xs text-[#EADFC8]">pts</span></p>
+                    <p className="text-[9px] text-[#D4AF37] font-bold uppercase tracking-widest mb-0.5">Loyalty Points</p>
+                    <p className="text-xl font-black text-white">{loyaltyPoints} <span className="text-xs text-[#EADFC8]">pts</span></p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">Total Spent</p>
-                    <p className="text-lg font-bold text-[#EADFC8]">৳ {totalSpent}</p>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">Total Spent</p>
+                    <p className="text-base font-bold text-[#EADFC8]">৳ {totalSpent}</p>
                   </div>
                 </div>
 
-                <div className="border-t border-[#EADFC8] pt-6 mb-8">
-                  <h3 className="font-bold text-[#B8860B] mb-6 uppercase tracking-[0.2em] text-xs border-b border-[#EADFC8] inline-block pb-2">Order History ({userOrders.length})</h3>
-                  <div className="space-y-4 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                    {userOrders.length === 0 ? <p className="text-[10px] text-gray-500 text-center py-8 font-bold tracking-[0.2em] uppercase border border-dashed border-[#EADFC8] rounded-sm bg-[#FAF5EB]">No orders yet.</p> : userOrders.map(order => (
-                      <div key={order.id} className="bg-[#FAF5EB] border border-[#EADFC8] p-5 rounded-sm shadow-sm text-sm">
-                        <div className="flex justify-between font-bold mb-4">
-                          <span className="text-[#111412] uppercase tracking-[0.15em] text-xs">Order #{order.id.split('-')[0]}</span>
-                          <span className={`px-3 py-1 rounded-sm text-[9px] font-black tracking-[0.2em] uppercase ${order.status === 'PENDING' ? 'text-yellow-600 bg-yellow-50 border border-yellow-200' : 'text-green-600 bg-green-50 border border-green-200'}`}>{order.status}</span>
+                <div className="border-t border-[#EADFC8] pt-4 mb-5 flex-1 overflow-hidden flex flex-col">
+                  <h3 className="font-bold text-[#B8860B] mb-3 uppercase tracking-[0.15em] text-xs">আমার অর্ডারসমূহ ({userOrders.length})</h3>
+                  <div className="space-y-4 overflow-y-auto custom-scrollbar pr-1 flex-1">
+                    {userOrders.length === 0 ? (
+                      <p className="text-xs text-gray-500 text-center py-8 font-bold tracking-widest uppercase border border-dashed border-[#EADFC8] rounded-sm bg-[#FAF5EB]">কোনো অর্ডার পাওয়া যায়নি।</p>
+                    ) : userOrders.map(order => (
+                      <div key={order.id} className="bg-[#FAF5EB] border border-[#EADFC8] p-4 rounded-sm shadow-sm text-sm">
+                        <div className="flex justify-between items-center font-bold mb-3 border-b border-[#EADFC8] pb-2">
+                          <span className="text-[#111412] uppercase tracking-wider text-xs">Order #{order.id.split('-')[0]}</span>
+                          <span className={`px-2.5 py-1 rounded-sm text-[9px] font-black tracking-widest uppercase ${getStatusColor(order.status)}`}>{order.status}</span>
                         </div>
-                        <p className="text-gray-600 font-bold text-xs uppercase tracking-wider">Total: <span className="font-black text-[#B8860B] text-sm">৳{order.total_amount}</span></p>
-                        <p className="text-[9px] text-gray-400 mt-3 font-bold tracking-[0.2em] uppercase">{new Date(order.created_at).toLocaleString()}</p>
+
+                        {/* Ordered Products List inside Profile */}
+                        {order.items && order.items.length > 0 && (
+                          <div className="space-y-2 mb-3">
+                            {order.items.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between bg-white p-2 rounded-sm border border-[#EADFC8]">
+                                <div className="flex items-center gap-2.5">
+                                  {item.image_url ? (
+                                    <img src={item.image_url} alt={item.name} className="w-10 h-10 object-cover rounded-sm border border-[#EADFC8]" />
+                                  ) : (
+                                    <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-[8px] text-gray-400">No Img</div>
+                                  )}
+                                  <div>
+                                    <p className="text-xs font-bold text-[#111412] line-clamp-1">{item.name}</p>
+                                    <p className="text-[10px] text-gray-500 font-bold">পরিমাণ: {item.quantity} টি × ৳{item.price}</p>
+                                  </div>
+                                </div>
+                                <span className="text-xs font-black text-[#B8860B]">৳{getNumericPrice(item.price) * item.quantity}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center pt-2 border-t border-[#EADFC8] text-xs">
+                          <span className="text-[10px] text-gray-500 font-bold">{new Date(order.created_at).toLocaleString()}</span>
+                          <span className="font-black text-[#111412]">মোট বিল: <span className="text-[#B8860B] text-sm">৳{order.total_amount}</span></span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-                <button onClick={handleLogout} className="w-full bg-white text-red-600 border border-red-200 py-4 rounded-sm font-bold hover:bg-red-50 hover:border-red-500 transition-colors uppercase tracking-[0.2em] text-xs shadow-sm">Logout</button>
+                <button onClick={handleLogout} className="w-full bg-white text-red-600 border border-red-200 py-3 rounded-sm font-bold hover:bg-red-50 hover:border-red-500 transition-colors uppercase tracking-[0.2em] text-xs shadow-sm">Logout</button>
               </div>
             </div>
           );
         })()}
 
+        {/* ========================================================================= */}
+        {/* UPDATED ORDER TRACKING & "WHAT I ORDERED" VIEW MODAL FOR ALL CUSTOMERS    */}
+        {/* ========================================================================= */}
         {showTrackingModal && (
-          <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 z-[1000]" onClick={() => setShowTrackingModal(false)}>
-            <div className="bg-white p-8 md:p-12 rounded-sm shadow-2xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto custom-scrollbar border-t-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setShowTrackingModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
-              <h2 className="text-2xl font-bold mb-8 text-[#B8860B] tracking-[0.2em] uppercase text-center border-b border-[#EADFC8] pb-4">অর্ডার ট্র্যাকিং</h2>
-              <form onSubmit={handleTrackOrder} className="flex flex-col sm:flex-row gap-4 mb-10">
-                <input type="text" required placeholder="মোবাইল নম্বর দিন" value={trackingPhone} onChange={e => setTrackingPhone(e.target.value)} className="flex-1 bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner transition-colors" />
-                <button type="submit" className="bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-8 py-4 rounded-sm font-bold shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors uppercase tracking-[0.2em] text-xs">{isTracking ? 'Searching...' : 'Track'}</button>
+          <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-3 md:p-4 z-[1000]" onClick={() => setShowTrackingModal(false)}>
+            <div className="bg-white p-5 md:p-8 rounded-sm shadow-2xl w-full max-w-lg relative max-h-[92vh] overflow-y-auto custom-scrollbar border-t-4 border-[#D4AF37]" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowTrackingModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-red-500 text-2xl transition-colors">✕</button>
+              <h2 className="text-xl md:text-2xl font-bold mb-2 text-[#B8860B] tracking-wider uppercase text-center">📦 আমার অর্ডার ও ট্র্যাকিং</h2>
+              <p className="text-center text-xs text-gray-500 font-medium mb-5 border-b border-[#EADFC8] pb-3">
+                আপনার অর্ডারকৃত মোবাইল নম্বর দিয়ে কী কী প্রোডাক্ট অর্ডার করেছেন এবং অর্ডারের বর্তমান অবস্থা দেখুন
+              </p>
+
+              <form onSubmit={handleTrackOrder} className="flex flex-col sm:flex-row gap-2.5 mb-6">
+                <input
+                  type="text"
+                  required
+                  placeholder="আপনার মোবাইল নম্বর দিন (01XXXXXXXXX)"
+                  value={trackingPhone}
+                  onChange={e => setTrackingPhone(e.target.value)}
+                  className="flex-1 bg-[#FAF5EB] border border-[#EADFC8] text-[#111412] p-3.5 rounded-sm text-sm font-bold outline-none focus:border-[#D4AF37] shadow-inner transition-colors"
+                />
+                <button type="submit" className="bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-6 py-3.5 rounded-sm font-bold shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors uppercase tracking-wider text-xs shrink-0">
+                  {isTracking ? 'খোঁজা হচ্ছে...' : 'অর্ডার দেখুন'}
+                </button>
               </form>
+
               {trackedOrders && (
-                <div className="space-y-6">
-                  {trackedOrders.length === 0 ? <p className="text-xs text-red-500 font-bold text-center border border-red-200 p-8 rounded-sm bg-red-50 uppercase tracking-[0.2em]">কোনো অর্ডার পাওয়া যায়নি!</p> : trackedOrders.map(order => (
-                    <div key={order.id} className="border border-[#EADFC8] p-6 rounded-sm bg-[#FAF5EB] shadow-sm text-sm">
-                      <div className="flex justify-between font-bold border-b border-[#D4AF37]/30 pb-4 mb-5">
-                        <span className="text-[#111412] uppercase tracking-[0.2em] text-sm">Order: {order.id.split('-')[0]}</span>
-                        <span className="text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-sm text-[9px] font-black tracking-[0.2em] uppercase">{order.status}</span>
+                <div className="space-y-5">
+                  {trackedOrders.length === 0 ? (
+                    <p className="text-xs text-red-600 font-bold text-center border border-red-200 p-6 rounded-sm bg-red-50">
+                      এই মোবাইল নম্বরে কোনো অর্ডার খুঁজে পাওয়া যায়নি! সঠিক ১১ ডিজিটের নম্বর দিয়ে আবার চেষ্টা করুন।
+                    </p>
+                  ) : trackedOrders.map(order => (
+                    <div key={order.id} className="border-2 border-[#EADFC8] p-4 md:p-5 rounded-sm bg-[#FAF5EB] shadow-sm text-sm">
+                      <div className="flex justify-between items-center font-bold border-b border-[#D4AF37]/30 pb-3 mb-3">
+                        <div>
+                          <span className="text-[#111412] uppercase tracking-wider text-xs block">Order ID: #{order.id.split('-')[0]}</span>
+                          <span className="text-[10px] text-gray-500 font-medium">{new Date(order.created_at).toLocaleString()}</span>
+                        </div>
+                        <span className={`px-3 py-1 rounded-sm text-[10px] font-black tracking-wider uppercase ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>
                       </div>
-                      <p className="font-bold text-gray-600 mb-3 uppercase tracking-wider text-xs">Amount: <span className="text-[#B8860B] font-black text-lg">৳{order.total_amount}</span></p>
-                      <p className="text-[9px] text-[#D4AF37] mt-4 font-bold tracking-[0.2em] uppercase bg-[#111412] inline-block px-3 py-1.5 rounded-sm">{new Date(order.created_at).toLocaleString()}</p>
+
+                      <div className="text-xs text-gray-700 mb-3 bg-white p-3 rounded-sm border border-[#EADFC8]">
+                        <p className="font-bold text-[#111412]">নাম: <span className="font-normal">{order.customer_name}</span></p>
+                        <p className="font-bold text-[#111412] mt-0.5">ফোন: <span className="font-normal">{order.customer_phone}</span></p>
+                        <p className="font-bold text-[#111412] mt-0.5">ঠিকানা: <span className="font-normal">{order.customer_address}</span></p>
+                        <p className="font-bold text-[#111412] mt-0.5">পেমেন্ট: <span className="font-normal">{order.payment_method}</span></p>
+                      </div>
+
+                      {/* Customer Ordered Items Detailed Section */}
+                      <div className="mb-3">
+                        <p className="text-[11px] font-black text-[#B8860B] uppercase tracking-wider mb-2">
+                          🛍️ অর্ডারকৃত পণ্যসমূহ ({order.items ? order.items.length : 0} টি):
+                        </p>
+                        {order.items && order.items.length > 0 ? (
+                          <div className="space-y-2">
+                            {order.items.map((item, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  setShowTrackingModal(false);
+                                  openProductModal(item);
+                                }}
+                                className="flex items-center justify-between bg-white p-2.5 rounded-sm border border-[#EADFC8] hover:border-[#D4AF37] cursor-pointer transition-colors"
+                              >
+                                <div className="flex items-center gap-3">
+                                  {item.image_url ? (
+                                    <img src={item.image_url} alt={item.name} className="w-12 h-12 object-cover rounded-sm border border-[#EADFC8] shrink-0" />
+                                  ) : (
+                                    <div className="w-12 h-12 bg-[#FAF5EB] rounded-sm border border-[#EADFC8] flex items-center justify-center text-[9px] text-gray-400 shrink-0">No Image</div>
+                                  )}
+                                  <div>
+                                    <p className="font-bold text-[#111412] text-xs line-clamp-1">{item.name}</p>
+                                    <p className="text-[11px] text-gray-600 font-bold mt-0.5">
+                                      দাম: ৳{item.price} × {item.quantity} টি
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right ml-2">
+                                  <span className="font-black text-[#B8860B] text-sm">৳{getNumericPrice(item.price) * item.quantity}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">পণ্যের তালিকা পাওয়া যায়নি</p>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-center border-t border-[#D4AF37]/30 pt-3 mt-2">
+                        <span className="text-xs font-bold text-gray-600">ডেলিভারি চার্জ: ৳{order.shipping_charge || 0}</span>
+                        <span className="font-black text-[#111412] text-sm">সর্বমোট বিল: <span className="text-[#B8860B] text-base">৳{order.total_amount}</span></span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2212,32 +2493,32 @@ export default function Home() {
         )}
 
         {showAdminDashboard && isAdmin && (
-          <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-4 z-[1000]">
+          <div className="fixed inset-0 bg-[#111412]/90 backdrop-blur-md flex items-center justify-center p-2 md:p-4 z-[1000]">
             <div className="bg-white rounded-sm max-w-[1400px] w-full h-[95vh] flex flex-col overflow-hidden shadow-2xl border-2 border-[#D4AF37]">
-              <div className="flex justify-between items-center bg-[#FAF5EB] text-[#111412] p-6 border-b border-[#EADFC8]">
-                <div className="flex items-center gap-5">
-                  <button onClick={() => setShowAdminDashboard(false)} className="flex items-center gap-2 bg-white text-[#111412] hover:bg-[#EADFC8] border border-[#D4AF37] px-5 py-2.5 rounded-sm font-bold uppercase tracking-[0.2em] text-xs transition-colors">
+              <div className="flex justify-between items-center bg-[#FAF5EB] text-[#111412] p-4 md:p-6 border-b border-[#EADFC8]">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setShowAdminDashboard(false)} className="flex items-center gap-2 bg-white text-[#111412] hover:bg-[#EADFC8] border border-[#D4AF37] px-4 py-2 rounded-sm font-bold uppercase tracking-[0.15em] text-xs transition-colors">
                     <span className="text-lg leading-none -mt-0.5">←</span> Back
                   </button>
-                  <h2 className="text-xl font-bold tracking-[0.2em] uppercase text-[#B8860B]">{isMasterAdmin ? 'Master Admin Panel' : 'Staff Operations Panel'}</h2>
+                  <h2 className="text-base md:text-xl font-bold tracking-[0.15em] uppercase text-[#B8860B]">{isMasterAdmin ? 'Master Admin Panel' : 'Staff Operations Panel'}</h2>
                 </div>
                 <button onClick={() => setShowAdminDashboard(false)} className="text-[#111412] hover:text-red-500 text-3xl leading-none transition-colors">✕</button>
               </div>
 
               <div className="flex border-b border-[#EADFC8] bg-white overflow-x-auto custom-scrollbar">
-                <button onClick={() => setAdminTab('dashboard')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'dashboard' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>📊 Dashboard</button>
-                <button onClick={() => setAdminTab('orders')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'orders' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>📦 Orders</button>
-                <button onClick={() => setAdminTab('abandoned')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'abandoned' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛒 Abandoned</button>
+                <button onClick={() => setAdminTab('dashboard')} className={`flex-1 py-4 px-4 whitespace-nowrap min-w-[110px] font-bold text-[11px] uppercase tracking-[0.15em] transition-colors duration-300 ${adminTab === 'dashboard' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>📊 Dashboard</button>
+                <button onClick={() => setAdminTab('orders')} className={`flex-1 py-4 px-4 whitespace-nowrap min-w-[110px] font-bold text-[11px] uppercase tracking-[0.15em] transition-colors duration-300 ${adminTab === 'orders' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>📦 Orders</button>
+                <button onClick={() => setAdminTab('abandoned')} className={`flex-1 py-4 px-4 whitespace-nowrap min-w-[110px] font-bold text-[11px] uppercase tracking-[0.15em] transition-colors duration-300 ${adminTab === 'abandoned' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛒 Abandoned</button>
                 {isMasterAdmin && (
                   <>
-                    <button onClick={() => setAdminTab('products')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Product List</button>
-                    <button onClick={() => setAdminTab('customers')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'customers' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>👥 Customers</button>
-                    <button onClick={() => setAdminTab('settings')} className={`flex-1 py-5 px-4 whitespace-nowrap min-w-[120px] font-bold text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Settings</button>
+                    <button onClick={() => setAdminTab('products')} className={`flex-1 py-4 px-4 whitespace-nowrap min-w-[110px] font-bold text-[11px] uppercase tracking-[0.15em] transition-colors duration-300 ${adminTab === 'products' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>🛍️ Products</button>
+                    <button onClick={() => setAdminTab('customers')} className={`flex-1 py-4 px-4 whitespace-nowrap min-w-[110px] font-bold text-[11px] uppercase tracking-[0.15em] transition-colors duration-300 ${adminTab === 'customers' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>👥 Customers</button>
+                    <button onClick={() => setAdminTab('settings')} className={`flex-1 py-4 px-4 whitespace-nowrap min-w-[110px] font-bold text-[11px] uppercase tracking-[0.15em] transition-colors duration-300 ${adminTab === 'settings' ? 'bg-[#FAF5EB] border-t-2 border-[#D4AF37] text-[#B8860B] shadow-inner' : 'text-gray-500 hover:bg-gray-50 hover:text-[#111412]'}`}>⚙️ Settings</button>
                   </>
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-white custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-4 md:p-10 bg-white custom-scrollbar">
 
                 {adminTab === 'dashboard' && (() => {
                   const deliveredOrders = orders.filter(o => o.status === 'DELIVERED');
@@ -2246,7 +2527,6 @@ export default function Home() {
 
                   const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
 
-                  // NET PROFIT CALCULATION
                   const totalProfit = deliveredOrders.reduce((sum, order) => {
                     const orderProfit = (order.items || []).reduce((itemSum, item) => {
                       const cost = 0;
@@ -2256,7 +2536,6 @@ export default function Home() {
                     return sum + orderProfit;
                   }, 0);
 
-                  // CHARTS DATA
                   const pieData = [
                     { name: 'Delivered', value: deliveredOrders.length, color: '#16a34a' },
                     { name: 'Pending', value: pendingOrders.length, color: '#ca8a04' },
@@ -2300,7 +2579,6 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* CHARTS SECTION */}
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 bg-white border border-[#EADFC8] p-6 rounded-md shadow-sm">
                           <h4 className="text-[11px] font-bold text-[#B8860B] uppercase tracking-widest mb-6">Revenue Trend (Last 7 Days)</h4>
@@ -2339,10 +2617,9 @@ export default function Home() {
 
                 {adminTab === 'settings' && isMasterAdmin && (
                   <div className="space-y-10">
-                    <form onSubmit={handleSaveSettings} className="bg-[#FAF5EB] p-8 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm">
+                    <form onSubmit={handleSaveSettings} className="bg-[#FAF5EB] p-6 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm">
                       <h3 className="font-bold text-xl mb-8 border-b border-[#D4AF37]/30 pb-4 text-[#111412] tracking-[0.2em] uppercase">Brand & System Settings</h3>
 
-                      {/* MULTI-ADMIN STAFF ROLE SYSTEM */}
                       <div className="bg-white p-6 border border-[#EADFC8] rounded-sm shadow-sm mb-8">
                         <label className="text-[10px] font-bold mb-4 block text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-2">Staff Role Management (Managers)</label>
                         <div className="flex flex-col gap-4">
@@ -2387,7 +2664,7 @@ export default function Home() {
                           <div className="flex items-center gap-6">
                             <div className="w-24 h-24 bg-[#111412] border-2 border-[#D4AF37] shadow-[0_0_10px_rgba(212,175,55,0.4)] rounded-full flex items-center justify-center overflow-hidden shrink-0 relative group">
                               {storeSettings.logo_url ? (
-                                <><img src={storeSettings.logo_url} className="w-full h-full object-cover" /><button type="button" onClick={() => handleRemoveImage('logo')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button></>
+                                <><img src={storeSettings.logo_url} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => handleRemoveImage('logo')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button></>
                               ) : <span className="text-[10px] text-[#D4AF37] font-bold uppercase tracking-wider text-center">No Logo</span>}
                             </div>
                             <div className="flex-1"><input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'logo')} className="text-xs text-gray-600 w-full bg-[#FAF5EB] p-3 border border-[#EADFC8] rounded-sm cursor-pointer outline-none focus:border-[#D4AF37]" />{uploadingType === 'logo' && <span className="text-[10px] text-[#B8860B] block mt-3 font-black tracking-[0.2em] uppercase">Uploading...</span>}</div>
@@ -2399,7 +2676,7 @@ export default function Home() {
                           <div className="flex items-center gap-6">
                             <div className="w-32 h-24 bg-[#FAF5EB] border border-[#D4AF37] shadow-sm rounded-sm flex items-center justify-center overflow-hidden shrink-0 relative group">
                               {storeSettings.category_banners?.['WEBSITE_BG'] ? (
-                                <><img src={storeSettings.category_banners['WEBSITE_BG']} className="w-full h-full object-cover" /><button type="button" onClick={() => handleRemoveImage('website_bg')} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 flex items-center justify-center rounded-sm text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button></>
+                                <><img src={storeSettings.category_banners['WEBSITE_BG']} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => handleRemoveImage('website_bg')} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 flex items-center justify-center rounded-sm text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button></>
                               ) : <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider text-center">No BG</span>}
                             </div>
                             <div className="flex-1 flex flex-col gap-3">
@@ -2441,7 +2718,7 @@ export default function Home() {
                           </div>
                           <div className="flex-1 border border-[#D4AF37]/50 bg-[#FAF5EB] p-4 rounded-sm">
                             <p className="text-[10px] font-bold text-[#B8860B] uppercase tracking-widest leading-relaxed">
-                              💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে। যেগুলো লিস্টে থাকবেবিধা না, সেগুলো অটোমেটিক নিচে চলে যাবে।
+                              💡 এখানে লেখা নাম অনুযায়ী ওয়েবসাইটে ক্যাটাগরির সেকশনগুলো পর্যায়ক্রমে (উপরে-নিচে) শো করবে।
                             </p>
                           </div>
                         </div>
@@ -2459,21 +2736,21 @@ export default function Home() {
                           </div>
                           <div className="flex-1 border border-[#25D366]/50 bg-[#25D366]/10 p-4 rounded-sm">
                             <p className="text-[10px] font-bold text-gray-700 uppercase tracking-widest leading-relaxed">
-                              💡 এখানে আপনি যে অ্যামাউন্ট সেট করবেন, কাস্টমার ব্যাগে প্রোডাক্ট রাখলে অটোমেটিক একটি "প্রোগ্রেস বার" দেখাবে। টার্গেট ফিলআপ হলে স্বয়ংক্রিয়ভাবে ডেলিভারি চার্জ ০ হয়ে যাবে! (অফারটি বন্ধ রাখতে 0 দিয়ে রাখুন)।
+                              💡 এখানে আপনি যে অ্যামাউন্ট সেট করবেন, কাস্টমার ব্যাগে প্রোডাক্ট রাখলে অটোমেটিক একটি "প্রোগ্রেস বার" দেখাবে। টার্গেট ফিলআপ হলে স্বয়ংক্রিয়ভাবে ডেলিভারি চার্জ ০ হয়ে যাবে!
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="mb-8 bg-white p-8 border border-[#EADFC8] rounded-sm shadow-sm">
+                      <div className="mb-8 bg-white p-6 md:p-8 border border-[#EADFC8] rounded-sm shadow-sm">
                         <label className="text-[11px] font-bold mb-6 block text-[#111412] uppercase tracking-[0.2em] border-b border-[#D4AF37]/50 pb-3">Flash Deal Slider Banners (5 Slots)</label>
                         <div className="space-y-5">
                           {[0, 1, 2, 3, 4].map(idx => (
-                            <div key={idx} className="flex items-center gap-6 border border-[#EADFC8] p-5 bg-[#FAF5EB] rounded-sm shadow-inner hover:border-[#D4AF37] transition-colors">
+                            <div key={idx} className="flex items-center gap-6 border border-[#EADFC8] p-4 bg-[#FAF5EB] rounded-sm shadow-inner hover:border-[#D4AF37] transition-colors">
                               <div className="w-32 h-16 bg-white border border-[#D4AF37]/50 flex items-center justify-center overflow-hidden shrink-0 rounded-sm relative group shadow-sm">
                                 {storeSettings.banners[idx]?.imageUrl ? (
                                   <>
-                                    <img src={storeSettings.banners[idx].imageUrl} className="w-full h-full object-cover" />
+                                    <img src={storeSettings.banners[idx].imageUrl} alt="" className="w-full h-full object-cover" />
                                     <button type="button" onClick={() => handleRemoveImage('banner', idx)} className="absolute top-1 right-1 bg-red-500 text-white w-5 h-5 flex items-center justify-center rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow" title="Remove Image">✕</button>
                                   </>
                                 ) : <span className="text-[9px] text-[#B8860B] font-black tracking-[0.2em]">SLIDE {idx + 1}</span>}
@@ -2488,7 +2765,7 @@ export default function Home() {
                       <button type="submit" className="w-full bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-8 py-5 text-[13px] font-bold rounded-sm shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors duration-300 tracking-[0.2em] uppercase">Save Brand Settings</button>
                     </form>
 
-                    <div className="bg-[#FAF5EB] p-8 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm mt-8">
+                    <div className="bg-[#FAF5EB] p-6 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm mt-8">
                       <div className="flex justify-between items-center mb-8 border-b border-[#D4AF37]/30 pb-4">
                         <h3 className="font-bold text-xl text-[#111412] tracking-[0.2em] uppercase">Custom Category Banners</h3>
                         <button type="button" onClick={() => setCustomSections([...customSections, { id: Date.now().toString(), title: 'New Banner Section', fontSize: 36, imageUrl: '', color: '#B8860B', imageHeight: 300 }])} className="bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-6 py-3 text-[10px] font-bold rounded-sm hover:bg-[#D4AF37] hover:text-[#111412] transition-colors shadow-md uppercase tracking-[0.2em]">+ Add New Banner</button>
@@ -2498,7 +2775,7 @@ export default function Home() {
                         {customSections.length === 0 ? (
                           <p className="text-gray-500 text-xs text-center py-10 border border-dashed border-[#D4AF37]/50 bg-white tracking-[0.2em] uppercase font-bold rounded-sm">No custom banners added yet.</p>
                         ) : customSections.map((section, index) => (
-                          <div key={section.id} className="flex flex-col md:flex-row gap-8 items-start md:items-center p-8 border border-[#EADFC8] rounded-sm bg-white shadow-sm relative group">
+                          <div key={section.id} className="flex flex-col md:flex-row gap-8 items-start md:items-center p-6 border border-[#EADFC8] rounded-sm bg-white shadow-sm relative group">
                             <button type="button" onClick={() => setCustomSections(customSections.filter(s => s.id !== section.id))} className="absolute top-4 right-4 bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-sm text-sm hover:bg-red-600 transition-colors shadow-md z-10" title="Delete Banner">✕</button>
 
                             <div className="w-full md:w-1/3 flex flex-col gap-5">
@@ -2526,11 +2803,11 @@ export default function Home() {
                               </div>
                             </div>
 
-                            <div className="w-full md:w-2/3 bg-[#FAF5EB] border border-[#D4AF37]/50 rounded-sm flex items-center justify-center overflow-hidden shadow-sm" style={{ height: section.imageHeight ? `${section.imageHeight}px` : '300px' }}>
+                            <div className="w-full md:w-2/3 bg-[#111412] border border-[#D4AF37]/50 rounded-sm flex items-center justify-center overflow-hidden shadow-sm max-h-[300px]">
                               {section.imageUrl ? (
-                                <img src={section.imageUrl} className="w-full h-full" style={{ objectFit: 'fill', width: '100%', height: '100%' }} />
+                                <img src={section.imageUrl} alt="" className="w-full h-auto max-h-[300px] object-cover object-center" />
                               ) : (
-                                <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">No Banner Uploaded</span>
+                                <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase py-20">No Banner Uploaded</span>
                               )}
                             </div>
                           </div>
@@ -2538,7 +2815,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <div className="bg-[#FAF5EB] p-8 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm mt-8">
+                    <div className="bg-[#FAF5EB] p-6 md:p-10 border border-[#EADFC8] rounded-sm shadow-sm mt-8">
                       <div className="flex items-center gap-4 mb-8 border-b border-[#D4AF37]/30 pb-4">
                         <h3 className="font-bold text-xl text-[#111412] tracking-[0.2em] uppercase">Website Pages Content</h3>
                         <div className="ml-auto flex items-center gap-3">
@@ -2553,7 +2830,7 @@ export default function Home() {
                           <textarea rows={3} value={storeSettings.contact_info} onChange={e => setStoreSettings({ ...storeSettings, contact_info: e.target.value })} style={{ color: storeSettings.page_text_color }} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner"></textarea>
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Facebook Page URL</label>
+                          <label className="text-[10px] font-bold mb-3 block text-[#B8860B] uppercase tracking-[0.2em]">Facebook Page Messenger URL</label>
                           <input type="text" value={storeSettings.fb_page_url} onChange={e => setStoreSettings({ ...storeSettings, fb_page_url: e.target.value })} style={{ color: storeSettings.page_text_color }} className="w-full bg-white border border-[#EADFC8] p-4 rounded-sm text-sm outline-none focus:border-[#D4AF37] transition-colors shadow-inner" />
                         </div>
                         <div>
@@ -2585,8 +2862,8 @@ export default function Home() {
                             <p className="font-black text-lg text-red-600 uppercase tracking-wider">Unfinished Draft</p>
                             <p className="text-[10px] text-gray-500 font-bold tracking-[0.2em] uppercase mt-2 bg-white px-3 py-1.5 rounded-sm border border-red-100 inline-block">{new Date(order.created_at).toLocaleString()}</p>
                           </div>
-                          <a href={`https://wa.me/88${order.customer_phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম ${order.customer_name === 'Guest' ? '' : order.customer_name}, আপনি আমাদের ওয়েবসাইটে কিছু প্রোডাক্ট ব্যাগে রেখেছিলেন কিন্তু অর্ডার কমপ্লিট করেননি। আপনার জন্য কি অর্ডারটি কনফার্ম করে দিবো?`)}`} target="_blank" className="bg-[#25D366] text-white text-[10px] px-4 py-2.5 rounded-sm font-bold uppercase tracking-[0.2em] hover:bg-[#128C7E] flex justify-center items-center gap-2 shadow-sm">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z" /></svg> WhatsApp Recovery
+                          <a href={`https://wa.me/88${order.customer_phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম ${order.customer_name === 'Guest' ? '' : order.customer_name}, আপনি আমাদের ওয়েবসাইটে কিছু প্রোডাক্ট ব্যাগে রেখেছিলেন কিন্তু অর্ডার কমপ্লিট করেননি। আপনার জন্য কি অর্ডারটি কনফার্ম করে দিবো?`)}`} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] text-white text-[10px] px-4 py-2.5 rounded-sm font-bold uppercase tracking-[0.2em] hover:bg-[#128C7E] flex justify-center items-center gap-2 shadow-sm">
+                            WhatsApp Recovery
                           </a>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
@@ -2624,7 +2901,6 @@ export default function Home() {
                       return (
                         <div key={order.id} className="bg-white border border-[#EADFC8] rounded-sm shadow-sm hover:border-[#D4AF37] transition-colors relative flex flex-col xl:flex-row overflow-hidden">
 
-                          {/* LEFT SIDE: Order Details */}
                           <div className="flex-1 p-6 md:p-8 border-b xl:border-b-0 xl:border-r border-[#EADFC8]">
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-[#D4AF37]/30 pb-5 mb-6 gap-5">
                               <div>
@@ -2659,7 +2935,7 @@ export default function Home() {
                                   {order.items.map((item, idx) => (
                                     <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-sm border border-[#EADFC8]">
                                       <div className="flex items-center gap-4">
-                                        {item.image_url ? (<img src={item.image_url} className="w-12 h-12 object-cover rounded-sm border border-[#EADFC8]" />) : (<div className="w-12 h-12 bg-[#FAF5EB] rounded-sm border border-[#EADFC8] flex items-center justify-center text-[8px] text-gray-400">No Img</div>)}
+                                        {item.image_url ? (<img src={item.image_url} alt="" className="w-12 h-12 object-cover rounded-sm border border-[#EADFC8]" />) : (<div className="w-12 h-12 bg-[#FAF5EB] rounded-sm border border-[#EADFC8] flex items-center justify-center text-[8px] text-gray-400">No Img</div>)}
                                         <div>
                                           <p className="font-bold text-[#111412] text-xs line-clamp-1">{item.name}</p>
                                           <p className="text-[9px] text-[#D4AF37] font-bold mt-1 uppercase tracking-widest">ID: {item.id.split('-')[0]}</p>
@@ -2673,19 +2949,18 @@ export default function Home() {
                             )}
                           </div>
 
-                          {/* RIGHT SIDE: Smart Actions & Risk Profile */}
                           <div className="w-full xl:w-[340px] bg-[#FAF5EB] p-6 md:p-8 flex flex-col gap-5 shrink-0 relative overflow-hidden">
                             <h4 className="font-bold text-[11px] text-[#B8860B] uppercase tracking-[0.2em] border-b border-[#EADFC8] pb-3 text-center">Smart Actions & Risk</h4>
                             <div className={`p-4 rounded-sm border ${badge.color} text-center shadow-sm relative overflow-hidden`}><div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-0"></div><p className="text-xs font-black uppercase tracking-widest relative z-10">{badge.label}</p></div>
                             <div className="bg-white p-4 rounded-sm border border-[#EADFC8] shadow-sm"><p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.2em] mb-1.5 flex items-center gap-1"><span>🌐</span> IP Tracker</p><p className="text-[11px] font-bold text-[#111412] mb-1">{order.ip_address || 'IP Not Recorded'}</p><p className="text-[10px] text-gray-500 leading-tight">{order.location || 'Unknown Location'}</p></div>
                             <div className="mt-auto pt-6 border-t border-[#EADFC8] flex flex-col gap-3">
-                              <a href={`https://wa.me/88${order.customer_phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম ${order.customer_name}, আপনার অর্ডার #${order.id.split('-')[0]} কনফার্ম করা হয়েছে। টোটাল বিল: ৳${order.total_amount}। ধন্যবাদ!`)}`} target="_blank" className="w-full bg-[#25D366] text-white text-[10px] py-4 rounded-sm font-bold uppercase tracking-[0.2em] hover:bg-[#128C7E] flex justify-center items-center gap-2 shadow-sm transition-colors border border-[#25D366]"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 001.602 6.002L.035 23.996l6.147-1.61A11.975 11.975 0 0011.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 20.155c-1.782 0-3.528-.48-5.06-1.385l-.36-.214-3.763.987.998-3.668-.235-.375A9.878 9.878 0 012.062 12c0-5.467 4.453-9.92 9.938-9.92s9.938 4.453 9.938 9.92-4.453 9.92-9.938 9.92zm5.452-7.443c-.298-.15-1.765-.87-2.038-.97-.272-.1-.47-.15-.67.15-.198.298-.767.97-.94 1.168-.172.2-.345.225-.643.075-2.06-1.03-3.418-2.313-4.44-4.08-.173-.298-.018-.46.13-.61.134-.134.298-.348.448-.522.15-.175.2-.298.298-.5.1-.198.05-.372-.025-.522-.075-.15-.67-1.618-.918-2.215-.24-.582-.487-.502-.67-.512-.172-.01-.37-.01-.568-.01-.198 0-.52.075-.793.372-.272.298-1.042 1.02-1.042 2.485s1.066 2.88 1.215 3.08c.15.2 2.1 3.205 5.088 4.493 2.015.87 2.854.945 3.923.792.833-.118 2.563-1.047 2.923-2.06.358-1.012.358-1.88.252-2.06-.104-.175-.378-.275-.675-.425z" /></svg>Send Invoice</a>
+                              <a href={`https://wa.me/88${order.customer_phone}?text=${encodeURIComponent(`আসসালামু আলাইকুম ${order.customer_name}, আপনার অর্ডার #${order.id.split('-')[0]} কনফার্ম করা হয়েছে। টোটাল বিল: ৳${order.total_amount}। ধন্যবাদ!`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white text-[10px] py-4 rounded-sm font-bold uppercase tracking-[0.2em] hover:bg-[#128C7E] flex justify-center items-center gap-2 shadow-sm transition-colors border border-[#25D366]">Send Invoice</a>
                               {isMasterAdmin && <button onClick={() => toggleBlockCustomer(order.customer_phone)} className={`w-full text-[10px] py-4 rounded-sm font-bold uppercase tracking-[0.2em] transition-colors shadow-sm border ${storeSettings.blocklist?.includes(order.customer_phone) ? 'bg-gray-200 text-gray-700 border-gray-400 hover:bg-gray-300' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white'}`}>{storeSettings.blocklist?.includes(order.customer_phone) ? '🔓 Unblock Customer' : '🚫 Block Customer'}</button>}
                             </div>
                           </div>
 
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 )}
@@ -2706,7 +2981,6 @@ export default function Home() {
                         <div className="flex-1 w-full"><label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Offer Price (বর্তমান দাম) <span className="text-red-500">*</span></label><input type="text" required placeholder="e.g. 999" value={bulkOfferPrice} onChange={e => setBulkOfferPrice(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-3 rounded-sm text-sm outline-none focus:border-[#D4AF37] shadow-inner" /></div>
                         <button type="submit" disabled={isBulkUpdating} className="w-full md:w-auto bg-[#111412] text-[#D4AF37] border border-[#D4AF37] px-8 py-3.5 text-[11px] font-bold rounded-sm shadow-md hover:bg-[#D4AF37] hover:text-[#111412] transition-colors tracking-[0.2em] uppercase whitespace-nowrap">{isBulkUpdating ? 'Updating...' : 'Apply to All'}</button>
                       </form>
-                      <p className="text-[10px] text-gray-500 font-bold tracking-[0.1em] mt-4 uppercase">⚠️ এটি সেভ করলে নির্বাচিত ক্যাটাগরির সকল প্রোডাক্টের দাম একযোগে পরিবর্তন হয়ে যাবে এবং অটোমেটিক ডিসকাউন্ট ব্যাজ তৈরি হবে।</p>
                     </div>
 
                     <div className="mb-6 flex justify-between items-center bg-[#FAF5EB] p-4 border border-[#EADFC8] rounded-sm shadow-sm">
@@ -2771,7 +3045,7 @@ export default function Home() {
 
         {showProductModal && isMasterAdmin && (
           <div className="fixed inset-0 bg-[#111412]/80 backdrop-blur-md flex items-center justify-center p-4 z-[1001]" onClick={() => setShowProductModal(false)}>
-            <div className="bg-[#FAF5EB] border-2 border-[#D4AF37] max-w-2xl w-full p-8 md:p-10 relative shadow-2xl rounded-sm max-h-[95vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#FAF5EB] border-2 border-[#D4AF37] max-w-2xl w-full p-6 md:p-10 relative shadow-2xl rounded-sm max-h-[95vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-8 border-b border-[#EADFC8] pb-5">
                 <button onClick={() => setShowProductModal(false)} className="flex items-center gap-2 text-[#111412] font-bold uppercase tracking-[0.2em] text-xs transition-colors bg-white hover:bg-[#EADFC8] border border-[#D4AF37] px-5 py-2.5 rounded-sm"><span className="text-xl leading-none -mt-0.5">←</span> ফিরে যান</button>
                 <h3 className="text-xl font-bold text-[#B8860B] uppercase tracking-[0.2em]">{editingProductId ? "Update Product" : "Add Product"}</h3>
@@ -2797,7 +3071,7 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-5">
                     {[{ url: newImageUrl, set: setNewImageUrl, id: 'product1' }, { url: newImageUrl2, set: setNewImageUrl2, id: 'product2' }, { url: newImageUrl3, set: setNewImageUrl3, id: 'product3' }, { url: newImageUrl4, set: setNewImageUrl4, id: 'product4' }].map((imgItem, idx) => (
                       <div key={idx} className="relative">
-                        {imgItem.url ? (<div className="w-full h-24 border border-[#D4AF37] rounded-sm overflow-hidden relative group shadow-sm bg-[#FAF5EB]"><img src={imgItem.url} className="w-full h-full object-cover" /><button type="button" onClick={() => imgItem.set('')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button></div>) : (<input type="file" accept="image/*" onChange={e => handleImageUpload(e, imgItem.id)} className="text-[11px] bg-[#FAF5EB] text-[#111412] p-3 border border-[#EADFC8] outline-none focus:border-[#D4AF37] rounded-sm w-full cursor-pointer h-24" />)}
+                        {imgItem.url ? (<div className="w-full h-24 border border-[#D4AF37] rounded-sm overflow-hidden relative group shadow-sm bg-[#FAF5EB]"><img src={imgItem.url} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => imgItem.set('')} className="absolute inset-0 m-auto bg-red-500 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-md" title="Remove Image">✕</button></div>) : (<input type="file" accept="image/*" onChange={e => handleImageUpload(e, imgItem.id)} className="text-[11px] bg-[#FAF5EB] text-[#111412] p-3 border border-[#EADFC8] outline-none focus:border-[#D4AF37] rounded-sm w-full cursor-pointer h-24" />)}
                         {uploadingType === imgItem.id && <span className="text-[10px] text-[#B8860B] absolute bottom-1 left-2 font-black tracking-widest bg-white/80 px-1 rounded">Uploading...</span>}
                       </div>
                     ))}
@@ -2820,7 +3094,6 @@ export default function Home() {
                 <div>
                   <label className="block text-[10px] font-bold mb-2 text-[#B8860B] uppercase tracking-[0.2em]">Description (HTML Support Available)</label>
                   <textarea rows={4} value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-white border border-[#EADFC8] text-[#111412] p-4 rounded-sm text-sm custom-scrollbar outline-none focus:border-[#D4AF37] shadow-inner transition-colors"></textarea>
-                  <p className="text-[9px] text-[#D4AF37] mt-2 font-bold tracking-widest">💡 আপনি চাইলে সাধারণ লেখার পাশাপাশি HTML ট্যাগ ব্যবহার করে লেখাকে স্টাইল করতে পারেন।</p>
                 </div>
 
                 <div className="flex gap-4 mt-6">
