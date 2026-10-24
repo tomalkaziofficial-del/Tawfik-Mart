@@ -76,6 +76,12 @@ const fontOptions = [
 
 const MASTER_ADMINS = ["kazitomalislam7@gmail.com"];
 
+// ============================================================================
+// CLOUDINARY CONFIGURATION (Replaced Supabase Storage to fix Egress Quota)
+// ============================================================================
+const CLOUDINARY_CLOUD_NAME = "gmkfbzc6";
+const CLOUDINARY_UPLOAD_PRESET = "zeenat_preset"; // Jodi preset-er naam onno kisu diye thaken, ekhane seta likhun
+
 const getProductViews = (id: string) => {
   if (!id) return 1200;
   let hash = 0;
@@ -1038,6 +1044,7 @@ export default function Home() {
       setIsReviewSubmitting(false);
     }
   };
+
   const updateOrderStatus = async (id: string, newStatus: string) => {
     try {
       const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id);
@@ -1061,18 +1068,34 @@ export default function Home() {
     }
   };
 
+  // ==========================================================================
+  // UPDATED IMAGE UPLOAD FUNCTION: Uploads to Cloudinary & Saves URL to Supabase
+  // ==========================================================================
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string, index?: number, catName?: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingType(type === 'custom_section' ? `custom_${catName}` : type);
-    const cleanFileName = `${Date.now()}_img_${Math.floor(Math.random() * 10000)}.${file.name.split('.').pop()}`;
 
     try {
-      const { error: uploadError } = await supabase.storage.from('products').upload(cleanFileName, file);
-      if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      formData.append("cloud_name", CLOUDINARY_CLOUD_NAME);
 
-      const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(cleanFileName);
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+
+      if (!uploadRes.ok || !uploadData.secure_url) {
+        throw new Error(uploadData?.error?.message || "Cloudinary upload failed");
+      }
+
+      // Automatically optimize image format (WebP/AVIF) & quality for ultra-fast loading
+      const publicUrl = uploadData.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
 
       if (type === 'logo') {
         const { error } = await supabase.from('store_settings').update({ logo_url: publicUrl }).eq('id', 1);
@@ -1093,17 +1116,22 @@ export default function Home() {
         return;
       } else if (type === 'product1') {
         setNewImageUrl(publicUrl);
+        showToast("ছবি ১ আপলোড সম্পন্ন!", "success");
       } else if (type === 'product2') {
         setNewImageUrl2(publicUrl);
+        showToast("ছবি ২ আপলোড সম্পন্ন!", "success");
       } else if (type === 'product3') {
         setNewImageUrl3(publicUrl);
+        showToast("ছবি ৩ আপলোড সম্পন্ন!", "success");
       } else if (type === 'product4') {
         setNewImageUrl4(publicUrl);
+        showToast("ছবি ৪ আপলোড সম্পন্ন!", "success");
       }
 
       fetchSettings();
     } catch (error: any) {
-      showToast("আপলোড ব্যর্থ!", "error");
+      console.error("Upload Error:", error);
+      showToast(error.message || "আপলোড ব্যর্থ!", "error");
     } finally {
       setUploadingType(null);
     }
@@ -1431,7 +1459,6 @@ export default function Home() {
       </div>
     );
   };
-
   return (
     <>
       <main
